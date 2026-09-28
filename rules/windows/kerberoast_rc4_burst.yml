@@ -1,0 +1,27 @@
+title: Kerberoasting - RC4 Service Ticket Burst
+id: ch-0001
+status: experimental
+description: >
+  Identify a single source requesting multiple RC4 (0x17) service tickets for user-backed SPNs in a
+  short window, deviating from an AES (0x12) baseline — typical of automated SPN ticket harvesting.
+tags: [attack.credential_access, attack.t1558.003]
+level: high
+logsource: {product: windows, service: security}
+detection:
+  selection:
+    EventID: 4769
+    TicketEncryptionType: '0x17'
+  filter_machine:
+    ServiceName|endswith: '$'
+  filter_krbtgt:
+    ServiceName: krbtgt
+  condition: selection and not filter_machine and not filter_krbtgt
+chainhunter:
+  kill_chain: Credential Access
+  actor_field: TargetUserName
+  source_field: IpAddress
+  collect_targets: ServiceName
+  threshold: {count: 3, within_seconds: 60, group_by: [IpAddress]}
+  queries:
+    kql: 'event.code:4769 and winlog.event_data.TicketEncryptionType:"0x17" and not winlog.event_data.ServiceName:*$'
+    spl: 'index=wineventlog EventCode=4769 Ticket_Encryption_Type=0x17 NOT Service_Name="*$" | bin _time span=1m | stats dc(Service_Name) as spns values(Service_Name) by _time, Client_Address | where spns>=3'

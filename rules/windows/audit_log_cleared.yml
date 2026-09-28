@@ -1,0 +1,20 @@
+title: Windows Event Log Cleared
+id: ch-0006
+status: experimental
+description: Identify clearing of the Security or System event log, a common anti-forensics step.
+tags: [attack.defense_evasion, attack.t1070.001]
+level: high
+logsource: {product: windows}
+detection:
+  sel_security:
+    EventID: 1102
+  sel_system:
+    EventID: 104
+    Channel: System
+  condition: 1 of sel_*
+chainhunter:
+  kill_chain: Defense Evasion
+  actor_field: [SubjectUserName, UserName]
+  queries:
+    kql: 'event.code:1102 or (event.code:104 and winlog.channel:System)'
+    spl: 'index=wineventlog (EventCode=1102 OR (EventCode=104 LogName=System)) | table _time host user'

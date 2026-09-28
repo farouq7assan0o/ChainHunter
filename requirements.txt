@@ -1,0 +1,2 @@
+pyyaml>=6.0
+python-evtx>=0.8  # only needed for .evtx input

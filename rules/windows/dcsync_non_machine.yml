@@ -1,0 +1,27 @@
+title: Directory Replication Requested by Non-Machine Account (DCSync)
+id: ch-0004
+status: experimental
+description: >
+  Identify directory replication rights (DS-Replication-Get-Changes / -All) exercised by a user
+  account; legitimate replication originates from domain controller machine accounts ending in $.
+tags: [attack.credential_access, attack.t1003.006]
+level: critical
+logsource: {product: windows, service: security}
+detection:
+  selection:
+    EventID: 4662
+    Properties|contains:
+      - 1131f6aa-9c07-11d1-f79f-00c04fc2dcd2
+      - 1131f6ad-9c07-11d1-f79f-00c04fc2dcd2
+      - 89e95b76-444d-4c62-991a-0facbeda640c
+  filter_machine:
+    SubjectUserName|endswith: '$'
+  condition: selection and not filter_machine
+chainhunter:
+  kill_chain: Impact
+  actor_field: SubjectUserName
+  source_field: SubjectDomainName
+  threshold: {count: 1, within_seconds: 3600, group_by: [SubjectUserName, Computer]}
+  queries:
+    kql: 'event.code:4662 and winlog.event_data.Properties:(*1131f6aa* or *1131f6ad* or *89e95b76*) and not winlog.event_data.SubjectUserName:*$'
+    spl: 'index=wineventlog EventCode=4662 (Properties="*1131f6aa*" OR Properties="*1131f6ad*" OR Properties="*89e95b76*") NOT Account_Name="*$" | table _time host Account_Name Account_Domain'

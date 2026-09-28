@@ -1,0 +1,23 @@
+title: NTLM Network Logon from Unmanaged Workstation Name
+id: ch-0003
+status: experimental
+description: >
+  Identify NTLM network logons (Type 3) whose reported workstation name matches common penetration
+  testing distributions, indicating valid credentials used from a non-corporate host.
+tags: [attack.defense_evasion, attack.lateral_movement, attack.t1550.002, attack.t1078]
+level: high
+logsource: {product: windows, service: security}
+detection:
+  selection:
+    EventID: 4624
+    LogonType: 3
+    AuthenticationPackageName: NTLM
+    WorkstationName|startswith: [kali, parrot, blackarch, pentest]
+  condition: selection
+chainhunter:
+  kill_chain: Lateral Movement
+  actor_field: TargetUserName
+  source_field: [IpAddress, WorkstationName]
+  queries:
+    kql: 'event.code:4624 and winlog.event_data.LogonType:3 and winlog.event_data.AuthenticationPackageName:NTLM and winlog.event_data.WorkstationName:(kali* or parrot*)'
+    spl: 'index=wineventlog EventCode=4624 Logon_Type=3 Authentication_Package=NTLM (Workstation_Name=kali* OR Workstation_Name=parrot*) | stats count by Account_Name, Source_Network_Address, host'

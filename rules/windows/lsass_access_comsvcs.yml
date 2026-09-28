@@ -1,0 +1,27 @@
+title: LSASS Memory Access via comsvcs.dll MiniDump
+id: ch-0002
+status: experimental
+description: >
+  Identify processes opening LSASS with full access where the call trace or command line references
+  comsvcs.dll — the living-off-the-land MiniDump technique used to extract credential material.
+tags: [attack.credential_access, attack.t1003.001]
+level: critical
+logsource: {product: windows, service: sysmon}
+detection:
+  sel_access:
+    EventID: 10
+    TargetImage|endswith: '\lsass.exe'
+  sel_access_trace:
+    - CallTrace|contains: comsvcs.dll
+    - SourceImage|endswith: '\rundll32.exe'
+  sel_proc:
+    EventID: 1
+    CommandLine|contains|all: [comsvcs, minidump]
+  condition: (sel_access and sel_access_trace) or sel_proc
+chainhunter:
+  kill_chain: Credential Access
+  actor_field: [SourceUser, User]
+  source_field: SourceImage
+  queries:
+    kql: 'event.code:10 and winlog.event_data.TargetImage:*\lsass.exe and (winlog.event_data.CallTrace:*comsvcs.dll* or winlog.event_data.SourceImage:*\rundll32.exe)'
+    spl: 'index=sysmon EventCode=10 TargetImage="*\lsass.exe" (CallTrace="*comsvcs.dll*" OR SourceImage="*\rundll32.exe") | table _time host SourceImage SourceUser GrantedAccess'
