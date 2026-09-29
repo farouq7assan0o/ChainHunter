@@ -21,3 +21,10 @@ chainhunter:
   queries:
     kql: 'event.code:4624 and winlog.event_data.LogonType:3 and winlog.event_data.AuthenticationPackageName:NTLM and winlog.event_data.WorkstationName:(kali* or parrot*)'
     spl: 'index=wineventlog EventCode=4624 Logon_Type=3 Authentication_Package=NTLM (Workstation_Name=kali* OR Workstation_Name=parrot*) | stats count by Account_Name, Source_Network_Address, host'
+
+tests:
+  match:
+    - {EventID: 4624, LogonType: 3, AuthenticationPackageName: NTLM, WorkstationName: KALI, TargetUserName: bob}
+  nomatch:
+    - {EventID: 4624, LogonType: 3, AuthenticationPackageName: Kerberos, WorkstationName: KALI}
+    - {EventID: 4624, LogonType: 3, AuthenticationPackageName: NTLM, WorkstationName: WS-FIN-01}

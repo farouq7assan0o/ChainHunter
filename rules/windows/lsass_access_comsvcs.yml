@@ -25,3 +25,11 @@ chainhunter:
   queries:
     kql: 'event.code:10 and winlog.event_data.TargetImage:*\lsass.exe and (winlog.event_data.CallTrace:*comsvcs.dll* or winlog.event_data.SourceImage:*\rundll32.exe)'
     spl: 'index=sysmon EventCode=10 TargetImage="*\lsass.exe" (CallTrace="*comsvcs.dll*" OR SourceImage="*\rundll32.exe") | table _time host SourceImage SourceUser GrantedAccess'
+
+tests:
+  match:
+    - {EventID: 10, TargetImage: 'C:\Windows\System32\lsass.exe', SourceImage: 'C:\Windows\System32\rundll32.exe', CallTrace: 'ntdll.dll|comsvcs.dll+2b9e'}
+    - {EventID: 1, Image: 'C:\Windows\System32\rundll32.exe', CommandLine: 'rundll32.exe C:\Windows\System32\comsvcs.dll, MiniDump 624 C:\temp\out.dmp full'}
+  nomatch:
+    - {EventID: 10, TargetImage: 'C:\Windows\System32\lsass.exe', SourceImage: 'C:\Program Files\Defender\MsMpEng.exe', CallTrace: ntdll.dll}
+    - {EventID: 10, TargetImage: 'C:\Windows\explorer.exe', SourceImage: 'C:\Windows\System32\rundll32.exe', CallTrace: comsvcs.dll}

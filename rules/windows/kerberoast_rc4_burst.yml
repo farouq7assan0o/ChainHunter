@@ -25,3 +25,17 @@ chainhunter:
   queries:
     kql: 'event.code:4769 and winlog.event_data.TicketEncryptionType:"0x17" and not winlog.event_data.ServiceName:*$'
     spl: 'index=wineventlog EventCode=4769 Ticket_Encryption_Type=0x17 NOT Service_Name="*$" | bin _time span=1m | stats dc(Service_Name) as spns values(Service_Name) by _time, Client_Address | where spns>=3'
+
+tests:
+  match:
+    - - {EventID: 4769, TicketEncryptionType: "0x17", ServiceName: svc1, TargetUserName: u, IpAddress: 10.0.0.5, _offset: 0}
+      - {EventID: 4769, TicketEncryptionType: "0x17", ServiceName: svc2, TargetUserName: u, IpAddress: 10.0.0.5, _offset: 5}
+      - {EventID: 4769, TicketEncryptionType: "0x17", ServiceName: svc3, TargetUserName: u, IpAddress: 10.0.0.5, _offset: 9}
+  nomatch:
+    - {EventID: 4769, TicketEncryptionType: "0x17", ServiceName: svc1, IpAddress: 10.0.0.5}
+    - - {EventID: 4769, TicketEncryptionType: "0x12", ServiceName: svc1, IpAddress: 10.0.0.5, _offset: 0}
+      - {EventID: 4769, TicketEncryptionType: "0x12", ServiceName: svc2, IpAddress: 10.0.0.5, _offset: 1}
+      - {EventID: 4769, TicketEncryptionType: "0x12", ServiceName: svc3, IpAddress: 10.0.0.5, _offset: 2}
+    - - {EventID: 4769, TicketEncryptionType: "0x17", ServiceName: "SRV1$", IpAddress: 10.0.0.5, _offset: 0}
+      - {EventID: 4769, TicketEncryptionType: "0x17", ServiceName: "SRV2$", IpAddress: 10.0.0.5, _offset: 1}
+      - {EventID: 4769, TicketEncryptionType: "0x17", ServiceName: "SRV3$", IpAddress: 10.0.0.5, _offset: 2}

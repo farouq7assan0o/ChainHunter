@@ -8,8 +8,22 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: pip install -e ".[dev]"
-      - run: python samples/make_demo.py
-      - run: pytest -q
-      - run: chainhunter samples/goad_demo.jsonl -o out
+      - name: Validate rules (lint + embedded tests)
+        run: chainhunter validate -v --navigator coverage_layer.json
+      - name: Unit + end-to-end tests
+        run: pytest -q
+      - name: Hunt demo dataset
+        run: |
+          python samples/make_demo.py
+          chainhunter hunt samples/goad_demo.jsonl -o out
+      - name: Compile rules
+        run: |
+          chainhunter convert --to kql > out/rules.kql
+          chainhunter convert --to eql > out/rules.eql
+          chainhunter convert --to spl > out/rules.spl
       - uses: actions/upload-artifact@v4
-        with: {name: chainhunter-report, path: out/}
+        with:
+          name: chainhunter-report
+          path: |
+            out/
+            coverage_layer.json

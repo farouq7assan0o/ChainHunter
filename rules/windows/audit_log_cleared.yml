@@ -18,3 +18,10 @@ chainhunter:
   queries:
     kql: 'event.code:1102 or (event.code:104 and winlog.channel:System)'
     spl: 'index=wineventlog (EventCode=1102 OR (EventCode=104 LogName=System)) | table _time host user'
+
+tests:
+  match:
+    - {EventID: 1102, SubjectUserName: bob}
+    - {EventID: 104, Channel: System}
+  nomatch:
+    - {EventID: 104, Channel: Application}

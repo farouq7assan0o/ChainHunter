@@ -22,6 +22,19 @@ ECS_MAP = {
 }
 
 
+# Native Security-log names -> Sysmon names, so one Sigma rule covers both sources
+ALIASES = {
+    4688: {"NewProcessName": "Image", "ParentProcessName": "ParentImage", "SubjectUserName": "User"},
+}
+
+
+def apply_aliases(ev: dict) -> dict:
+    for src, dst in ALIASES.get(ev.get("EventID"), {}).items():
+        if src in ev and dst not in ev:
+            ev[dst] = ev[src]
+    return ev
+
+
 def _flatten(obj: dict, prefix: str = "") -> dict:
     out = {}
     for k, v in obj.items():
@@ -62,7 +75,7 @@ def normalize(raw: dict) -> dict:
         ev["EventID"] = int(ev["EventID"])
     if "TimeCreated" in ev:
         ev["TimeCreated"] = parse_time(ev["TimeCreated"])
-    return ev
+    return apply_aliases(ev)
 
 
 def load_json(path: Path) -> Iterator[dict]:
@@ -97,7 +110,7 @@ def load_evtx(path: Path) -> Iterator[dict]:
             for data in root.iterfind("e:EventData/e:Data", ns):
                 if data.get("Name"):
                     ev[data.get("Name")] = data.text or ""
-            yield ev
+            yield apply_aliases(ev)
 
 
 def load(paths: list[Path]) -> list[dict]:

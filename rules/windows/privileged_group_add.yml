@@ -15,7 +15,14 @@ detection:
 chainhunter:
   kill_chain: Privilege Escalation
   actor_field: SubjectUserName
-  source_field: MemberName
+  source_field: []
+  collect_targets: MemberName
   queries:
     kql: 'event.code:(4728 or 4732 or 4756) and winlog.event_data.TargetUserName:("Domain Admins" or "Enterprise Admins" or "Administrators")'
     spl: 'index=wineventlog EventCode IN (4728,4732,4756) Group_Name IN ("Domain Admins","Enterprise Admins","Administrators") | table _time host src_user Member_Name Group_Name'
+
+tests:
+  match:
+    - {EventID: 4728, SubjectUserName: admin, TargetUserName: Domain Admins, MemberName: "CN=bob,CN=Users,DC=corp,DC=local"}
+  nomatch:
+    - {EventID: 4728, SubjectUserName: admin, TargetUserName: Marketing, MemberName: "CN=bob,CN=Users,DC=corp,DC=local"}

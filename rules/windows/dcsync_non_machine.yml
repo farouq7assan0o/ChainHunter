@@ -20,8 +20,15 @@ detection:
 chainhunter:
   kill_chain: Impact
   actor_field: SubjectUserName
-  source_field: SubjectDomainName
+  source_field: []
   threshold: {count: 1, within_seconds: 3600, group_by: [SubjectUserName, Computer]}
   queries:
     kql: 'event.code:4662 and winlog.event_data.Properties:(*1131f6aa* or *1131f6ad* or *89e95b76*) and not winlog.event_data.SubjectUserName:*$'
     spl: 'index=wineventlog EventCode=4662 (Properties="*1131f6aa*" OR Properties="*1131f6ad*" OR Properties="*89e95b76*") NOT Account_Name="*$" | table _time host Account_Name Account_Domain'
+
+tests:
+  match:
+    - {EventID: 4662, SubjectUserName: bob, Properties: "%%7688 {1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}"}
+  nomatch:
+    - {EventID: 4662, SubjectUserName: "DC01$", Properties: "%%7688 {1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}"}
+    - {EventID: 4662, SubjectUserName: bob, Properties: "%%7685 {bf967aba-0de6-11d0-a285-00aa003049e2}"}

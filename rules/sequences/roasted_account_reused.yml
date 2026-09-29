@@ -1,0 +1,34 @@
+title: Kerberoasted Account Subsequently Authenticates (Cracked Credential Reuse)
+id: ch-s001
+status: experimental
+description: >
+  Confirm that an account whose SPN ticket was harvested in an RC4 burst later authenticates over
+  the network — evidence the offline crack succeeded and the credential is now in attacker hands.
+tags: [attack.credential_access, attack.t1558.003, attack.lateral_movement, attack.t1078.002]
+level: critical
+sequence:
+  within_seconds: 14400
+  steps:
+    - id: roast
+      rule: ch-0001
+    - id: use
+      detection:
+        selection:
+          EventID: 4624
+          LogonType: [3, 10]
+      chainhunter: {actor_field: TargetUserName, source_field: IpAddress}
+  join:
+    - [roast.ServiceName, use.actor]
+chainhunter:
+  kill_chain: Lateral Movement
+tests:
+  match:
+    - - {EventID: 4769, TicketEncryptionType: "0x17", ServiceName: svc_a, TargetUserName: eve, IpAddress: 10.9.9.9, _offset: 0}
+      - {EventID: 4769, TicketEncryptionType: "0x17", ServiceName: svc_b, TargetUserName: eve, IpAddress: 10.9.9.9, _offset: 1}
+      - {EventID: 4769, TicketEncryptionType: "0x17", ServiceName: svc_c, TargetUserName: eve, IpAddress: 10.9.9.9, _offset: 2}
+      - {EventID: 4624, LogonType: 3, TargetUserName: svc_b, IpAddress: 10.9.9.9, _offset: 900}
+  nomatch:
+    - - {EventID: 4769, TicketEncryptionType: "0x17", ServiceName: svc_a, TargetUserName: eve, IpAddress: 10.9.9.9, _offset: 0}
+      - {EventID: 4769, TicketEncryptionType: "0x17", ServiceName: svc_b, TargetUserName: eve, IpAddress: 10.9.9.9, _offset: 1}
+      - {EventID: 4769, TicketEncryptionType: "0x17", ServiceName: svc_c, TargetUserName: eve, IpAddress: 10.9.9.9, _offset: 2}
+      - {EventID: 4624, LogonType: 3, TargetUserName: unrelated_user, IpAddress: 10.9.9.9, _offset: 900}

@@ -1,7 +1,7 @@
 [project]
 name = "chainhunter"
-version = "0.1.0"
-description = "Turn Windows logs into correlated attack chains, ATT&CK layers and a CDSA-style incident report."
+version = "0.2.0"
+description = "Correlated attack-chain detection for Windows logs: Sigma, sequences, UEBA, risk-based alerting."
 requires-python = ">=3.10"
 dependencies = ["pyyaml>=6.0"]
 

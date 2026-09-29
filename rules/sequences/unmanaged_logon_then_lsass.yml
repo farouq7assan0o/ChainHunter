@@ -1,0 +1,26 @@
+title: Unmanaged-Host Logon Followed by LSASS Access on the Same Host
+id: ch-s002
+status: experimental
+description: >
+  Link a network logon from an unmanaged workstation to LSASS memory access on the same host within
+  an hour — hands-on-keyboard credential harvesting after remote access.
+tags: [attack.lateral_movement, attack.t1550.002, attack.credential_access, attack.t1003.001]
+level: critical
+sequence:
+  within_seconds: 3600
+  steps:
+    - id: logon
+      rule: ch-0003
+    - id: dump
+      rule: ch-0002
+  join:
+    - [logon.host, dump.host]
+chainhunter:
+  kill_chain: Credential Access
+tests:
+  match:
+    - - {EventID: 4624, LogonType: 3, AuthenticationPackageName: NTLM, WorkstationName: KALI, TargetUserName: bob, IpAddress: 10.1.1.1, Computer: srv01, _offset: 0}
+      - {EventID: 10, TargetImage: 'C:\Windows\System32\lsass.exe', SourceImage: 'C:\Windows\System32\rundll32.exe', CallTrace: comsvcs.dll, Computer: srv01, _offset: 600}
+  nomatch:
+    - - {EventID: 4624, LogonType: 3, AuthenticationPackageName: NTLM, WorkstationName: KALI, TargetUserName: bob, IpAddress: 10.1.1.1, Computer: srv01, _offset: 0}
+      - {EventID: 10, TargetImage: 'C:\Windows\System32\lsass.exe', SourceImage: 'C:\Windows\System32\rundll32.exe', CallTrace: comsvcs.dll, Computer: srv02, _offset: 600}
