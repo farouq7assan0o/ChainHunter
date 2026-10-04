@@ -1,0 +1,129 @@
+samples:
+- source: evtx-attack-samples
+  path: Credential Access/CA_DCSync_4662.evtx
+  sha256: 679b2ff27af6c932c07bf3e81391e455fae98e69bf3aff0f524e31aadc418131
+  expect:
+  - ch-0004
+- source: evtx-attack-samples
+  path: Credential Access/sysmon_10_1_memdump_comsvcs_minidump.evtx
+  sha256: d1bf591cabf7d21f49936150bfaf433da7665211ba3fd00bc806f4912a6f96b4
+  expect:
+  - ch-0002
+- source: evtx-attack-samples
+  path: Credential Access/sysmon_10_lsass_mimikatz_sekurlsa_logonpasswords.evtx
+  sha256: 9a1689574ed08c1fb18e7ff3f3bed612109aedcb7bf8efbf3537d756e669e96f
+- source: evtx-attack-samples
+  path: Credential Access/sysmon_10_11_lsass_memdump.evtx
+  sha256: 915f0859251552b6c33efc32f6184d2c25419c5859852124a7f14ed6ec1a3723
+- source: evtx-attack-samples
+  path: Credential Access/sysmon_rdrleakdiag_lsass_dump.evtx
+  sha256: 17f010bff45a34212e5c5ff13ed1106274f65e3524fc508f7481db8aaeef0434
+- source: evtx-attack-samples
+  path: Credential Access/Powershell_4104_MiniDumpWriteDump_Lsass.evtx
+  sha256: 54ff62eff26af588782e066b7b3b1b952bc83e1b75a84d81f9492e654cb5c319
+- source: evtx-attack-samples
+  path: Credential Access/kerberos_pwd_spray_4771.evtx
+  sha256: 4a0a1c7132e216dbc704c806e9429df9ae3ac00485d5238e50c776e3099ae11d
+- source: evtx-attack-samples
+  path: Credential Access/Zerologon_VoidSec_CVE-2020-1472_4626_LT3_Anonym_follwedby_4742_DC_Anony_DC.evtx
+  sha256: 7ea57911a3afea3777e503e69d30d91b635201df3e6f7f5bbffb1495791064e6
+- source: evtx-attack-samples
+  path: Credential Access/dc_applog_ntdsutil_dfir_325_326_327.evtx
+  sha256: 56b83f3f107ad9e02ecbcdc849930608f86cac1269d156c90e38326bc401a6ec
+- source: evtx-attack-samples
+  path: Credential Access/babyshark_mimikatz_powershell.evtx
+  sha256: 3747c33a60a32142bf4e30bf023f155b2c0d6e7a018bce8b7bafbd5aa7ec109c
+- source: evtx-attack-samples
+  path: Lateral Movement/LM_4624_mimikatz_sekurlsa_pth_source_machine.evtx
+  sha256: bbfd87cacdd56a9135de1838666937cd6c74daba47b366bba0c11f95ce97f461
+- source: evtx-attack-samples
+  path: Lateral Movement/LM_Remote_Service02_7045.evtx
+  sha256: af758eb492b6d5ab6665f7e4c44b31490f57be78c37dc0a8b1da714bb0d3d458
+- source: evtx-attack-samples
+  path: Lateral Movement/LM_renamed_psexecsvc_5145.evtx
+  sha256: 38343c25834964a28a23cb9ad43e1d72c8ffbac0b21105877956e80e38465f4d
+- source: evtx-attack-samples
+  path: Lateral Movement/LM_sysmon_psexec_smb_meterpreter.evtx
+  sha256: 18ffdda9c24e593d6b1414b6e05c7f7a5dbffb8588a387c165431b61ab52d76f
+- source: evtx-attack-samples
+  path: Lateral Movement/LM_wmiexec_impacket_sysmon_whoami.evtx
+  sha256: 21b8852b2b386f4d3f6f0c8a7304de8e628bb43cfa23888ab317b95b784ffe59
+- source: evtx-attack-samples
+  path: Lateral Movement/LM_WMI_4624_4688_TargetHost.evtx
+  sha256: 3ff3fcdb55c08ec0eaa39b25c1e02a205314f367bcedc662586bd063185ca41d
+- source: evtx-attack-samples
+  path: Lateral Movement/LM_ScheduledTask_ATSVC_target_host.evtx
+  sha256: 53999570b8edb7f909cb07165fecda1f29bf04e3462d13dc404e31f31a9ab932
+- source: evtx-attack-samples
+  path: Execution/temp_scheduled_task_4698_4699.evtx
+  sha256: a7decf0fbabc340e37de7e7c39fddd5398a7106a4f6acded0ea1d2ffa6bf8b70
+- source: evtx-attack-samples
+  path: Persistence/Network_Service_Guest_added_to_admins_4732.evtx
+  sha256: 9619b9d9d7bb8a277080167ff639fd9162e3d88d61d674cf1606beadce17ea5a
+  expect:
+  - ch-0005
+- source: evtx-attack-samples
+  path: Persistence/persistence_security_dcshadow_4742.evtx
+  sha256: 524c34f83dd4dd1091100222caaf36e92aa3eaaf974f7aa0c07ad97aefcdcb66
+- source: evtx-attack-samples
+  path: Defense Evasion/DE_104_system_log_cleared.evtx
+  sha256: 5579cdca073ee4864ea82d656aa2d25400b5c1e85b8e688db5d85f6dc558c2af
+  expect:
+  - ch-0006
+- source: evtx-attack-samples
+  path: Defense Evasion/DE_1102_security_log_cleared.evtx
+  sha256: a0615707b547a2ac254688fd725c3c590f62440fc9b7947c2843dd40498a39e8
+  expect:
+  - ch-0006
+- source: evtx-attack-samples
+  path: Defense Evasion/DE_renamed_psexec_service_sysmon_17_18.evtx
+  sha256: 3b58311891bc80b239da102dec9c462d9c8d07c1f0ba5fedaf2c59e1e4447179
+- source: evtx-attack-samples
+  path: Execution/sysmon_lolbin_bohops_vshadow_exec.evtx
+  sha256: 9cabd9accd1cad037ef7408bfddd9639f793665b73634833722b8cd842485fed
+- source: evtx-attack-samples
+  path: Credential Access/CA_hashdump_4663_4656_lsass_access.evtx
+  sha256: 05fc4e1cf2a55b2b0c1623e4404e42f281dc68e0f024503527d19f3c065d39ac
+- source: evtx-attack-samples
+  path: Privilege Escalation/sysmon_privesc_psexec_dwell.evtx
+  sha256: a79a14dcaac146c06c4d3dc3eb5a6ca1eaf62c93d65f47699a2aa5e88e436223
+- source: otrf
+  path: datasets/atomic/windows/credential_access/host/covenant_dcsync_dcerpc_drsuapi_DsGetNCChanges.zip
+  sha256: ccbb0e91c03fa1d575b3bfccba59f3bba62479860bd9ee8b571a907333eb9082
+  expect:
+  - ch-0004
+- source: otrf
+  path: datasets/atomic/windows/credential_access/host/psh_lsass_memory_dump_comsvcs.zip
+  sha256: 0af9e920220d746432f0972be83ad057629695540aecd68c15869d190786e1ae
+  expect:
+  - ch-0002
+- source: otrf
+  path: datasets/atomic/windows/credential_access/host/cmd_psexec_lsa_secrets_dump.zip
+  sha256: c52e6145fefe37373a5274e2976ccf6d62e4d33e13c55dc1a2ce17f00506d1a6
+- source: otrf
+  path: datasets/atomic/windows/lateral_movement/host/empire_psexec_dcerpc_tcp_svcctl.zip
+  sha256: 8f40e7fc86bbbf31ebd50b3ba537cf0f4378392ae3e74de84bee00aeb0de1fa5
+- source: otrf
+  path: datasets/compound/apt29/day1/apt29_evals_day1_manual.zip
+  campaign: true
+  sha256: 98a073140860560d70080ace9142961be4f64b4862bae892d62d0f254d0fdbe5
+- source: otrf
+  path: datasets/compound/GoldenSAMLADFSMailAccess/WindowsEvents.Zip
+  campaign: true
+  sha256: d5ed3b0b8040ec2f7406a30d1d6051ee83b37634ec524205dcad0f5dfd5b616a
+- source: otrf
+  path: datasets/compound/GoldenSAMLADFSMailAccess/AADAuditEvents.Zip
+  campaign: true
+  sha256: c45f9b67de7ac1eede1e0f37d7448aadf76e0f238bd4403df047cc164fc8ea02
+- source: otrf
+  path: datasets/compound/GoldenSAMLADFSMailAccess/OfficeActivityEvents.Zip
+  campaign: true
+  sha256: 0348e0df9231aa311b2a71af6f9aae7d15bdf269ba4f1d0768bf8b666c8c8d03
+- source: otrf
+  path: datasets/compound/GoldenSAMLADFSMailAccess/Microsoft365DefenderEvents.Zip
+  campaign: true
+  sha256: 693a86732e0762c709b9c39ba81f1027ab8b1e24c781db6ee3f6ccef3ecf6ebe
+- source: otrf
+  path: datasets/atomic/windows/lateral_movement/host/aadinternals_export_adfsdatabaseconfig_remotely.zip
+  campaign: true
+  sha256: de1af624eb6cccaf9db82063ff2e27a444b178b1dd45889c50971c6fbf3d062e

@@ -16,9 +16,10 @@ from datetime import timedelta
 from .detect import Detection
 from .sequence import norm_entity
 
-TACTIC_ORDER = ["Reconnaissance", "Initial Access", "Execution", "Persistence", "Privilege Escalation",
-                "Defense Evasion", "Credential Access", "Discovery", "Lateral Movement", "Collection",
-                "Command and Control", "Exfiltration", "Impact"]
+TACTIC_ORDER = ["Reconnaissance", "Resource Development", "Initial Access", "Execution", "Persistence",
+                "Privilege Escalation", "Defense Evasion", "Stealth", "Defense Impairment", "Credential Access",
+                "Discovery", "Lateral Movement", "Collection", "Command and Control", "Exfiltration", "Impact"]
+ALERT_LEVELS = {"medium", "high", "critical"}
 LEVEL_SCORE = {"informational": 1, "low": 2, "medium": 4, "high": 7, "critical": 10}
 KIND_WEIGHT = {"signature": 1.0, "sequence": 1.5, "anomaly": 0.5}
 RISK_THRESHOLD = 300
@@ -62,12 +63,14 @@ class Chain:
         """Phases in order of first occurrence, so the chain reads as the attack unfolded.
 
         Sequence detections confirm phases but don't set the order (they're stamped at their first stage);
-        simultaneous detections tie-break on ATT&CK tactic order.
+        simultaneous detections tie-break on ATT&CK tactic order. Informational/low alerts are context, not
+        story: on real APT29 data an informational "User Logoff" rule tagged Impact otherwise led the chain.
         """
         def rank(d):
             ph = d.rule.meta.get("kill_chain", "Unknown")
             return d.time, TACTIC_ORDER.index(ph) if ph in TACTIC_ORDER else 99
-        base = sorted((d for d in self.detections if d.rule.kind != "sequence"), key=rank)
+        story = [d for d in self.detections if d.rule.kind != "sequence" and d.rule.level in ALERT_LEVELS]
+        base = sorted(story or [d for d in self.detections if d.rule.kind != "sequence"], key=rank)
         seq = [d for d in self.detections if d.rule.kind == "sequence"]
         return list(dict.fromkeys(d.rule.meta.get("kill_chain", "Unknown") for d in base + seq))
 
@@ -131,13 +134,18 @@ def correlate(detections: list[Detection], window: timedelta = timedelta(hours=6
             i = parent[i]
         return i
 
-    keys = [_keys(d) for d in detections]
-    for i in range(n):
-        for j in range(i + 1, n):
-            if detections[j].time - detections[i].end > window:
-                break
-            if keys[i] & keys[j]:
+    # Linear-time linking. Link rule: j joins an earlier i that shares an entity key when
+    # j.time - i.end <= window. For each key keep the earlier detection with the latest end: if *any* earlier
+    # i qualifies, that one does, and every qualifying i is already connected to it - so the components are
+    # identical to the all-pairs version (verified against it in tests). 95,700 detections: 61s -> <1s.
+    best: dict[str, int] = {}
+    for j, d in enumerate(detections):
+        for k in _keys(d):
+            i = best.get(k)
+            if i is not None and d.time - detections[i].end <= window:
                 parent[find(i)] = find(j)
+            if i is None or d.end > detections[i].end:
+                best[k] = j
 
     groups: dict[int, list[Detection]] = {}
     for i, d in enumerate(detections):

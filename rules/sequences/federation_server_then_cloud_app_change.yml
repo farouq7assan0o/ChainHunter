@@ -1,0 +1,61 @@
+title: Federation Server Database Access Followed by Cloud Application Credential or Permission Change
+id: ch-s004
+status: experimental
+description: >
+  Link an uncommon process reading the AD FS configuration database on a federation server to an application
+  credential or delegated-permission change in the same federated domain in Entra ID / Microsoft 365. The
+  two stages share no account, IP or host (the cloud identity can be forged with stolen token-signing
+  material), so they are joined on the DNS domain the federation server serves. Stage one mirrors SigmaHQ
+  rule 1ea13e8c-03ea-409b-877d-ce5c3d2c1cb3; stage two mirrors cbb67ecc-fb70-4467-9350-c910bdf7c628.
+references:
+  - https://github.com/OTRF/Security-Datasets/tree/master/datasets/compound/GoldenSAMLADFSMailAccess
+tags: [attack.credential_access, attack.t1552.004, attack.persistence, attack.t1098.001, attack.defense_evasion, attack.t1606.002]
+level: critical
+sequence:
+  within_seconds: 21600
+  steps:
+    - id: federation
+      detection:
+        selection:
+          EventID: [17, 18]
+          PipeName: '\MICROSOFT##WID\tsql\query'
+        filter_known:
+          Image|endswith:
+            - '\mmc.exe'
+            - '\svchost.exe'
+            - '\wsmprovhost.exe'
+            - '\sqlwriter.exe'
+            - '\AzureADConnect.exe'
+            - '\Microsoft.Identity.Health.Adfs.PshSurrogate.exe'
+            - '\Microsoft.IdentityServer.ServiceHost.exe'
+            - '\Microsoft.Tri.Sensor.exe'
+            - '\sqlservr.exe'
+            - '\tssdis.exe'
+        condition: selection and not filter_known
+      chainhunter: {actor_field: [User], source_field: Image}
+    - id: cloud
+      detection:
+        sel_entra:
+          properties.message:
+            - 'Update application - Certificates and secrets management'
+            - 'Add service principal credentials'
+            - 'Update Service principal/Update Application'
+            - 'Add delegated permission grant'
+            - 'Consent to application'
+        sel_defender:
+          ActionType|startswith: ['Add delegated permission grant', 'Consent to application']
+        condition: 1 of sel_*
+      chainhunter: {actor_field: [User], source_field: [IpAddress]}
+  join:
+    - [federation.domain, cloud.domain]
+chainhunter:
+  kill_chain: Persistence
+tests:
+  match:
+    - - {EventID: 18, Channel: Microsoft-Windows-Sysmon/Operational, Computer: ADFS01.corp.example, PipeName: '\MICROSOFT##WID\tsql\query', Image: 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe', _offset: 0}
+      - {EventID: 0, _platform: azure, Channel: auditlogs, Computer: Entra ID, User: alice@corp.example, properties.message: 'Update application - Certificates and secrets management', _offset: 1400}
+  nomatch:
+    - - {EventID: 18, Channel: Microsoft-Windows-Sysmon/Operational, Computer: ADFS01.corp.example, PipeName: '\MICROSOFT##WID\tsql\query', Image: 'C:\Windows\ADFS\Microsoft.IdentityServer.ServiceHost.exe', _offset: 0}
+      - {EventID: 0, _platform: azure, Channel: auditlogs, Computer: Entra ID, User: alice@corp.example, properties.message: 'Update application - Certificates and secrets management', _offset: 1400}
+    - - {EventID: 18, Channel: Microsoft-Windows-Sysmon/Operational, Computer: ADFS01.corp.example, PipeName: '\MICROSOFT##WID\tsql\query', Image: 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe', _offset: 0}
+      - {EventID: 0, _platform: azure, Channel: auditlogs, Computer: Entra ID, User: bob@other.example, properties.message: 'Update application - Certificates and secrets management', _offset: 1400}

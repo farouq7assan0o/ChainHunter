@@ -141,7 +141,8 @@ def compile_rule(rule: Rule, lang: str, registry: dict[str, Rule] | None = None)
         q = f"(index=wineventlog OR index=sysmon) {body}"
         if thr:
             by = ", ".join(SPL.get(g, g) for g in thr.get("group_by", []))
-            q += (f" | bin _time span={thr.get('within_seconds', 60)}s | stats count by _time"
+            agg = f"dc({SPL.get(thr['distinct'], thr['distinct'])}) as count" if thr.get("distinct") else "count"
+            q += (f" | bin _time span={thr.get('within_seconds', 60)}s | stats {agg} by _time"
                   f"{', ' + by if by else ''} | where count>={thr['count']}")
         return q
     if lang == "eql":

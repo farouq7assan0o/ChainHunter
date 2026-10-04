@@ -7,7 +7,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[dev,evtx]"
       - name: Validate rules (lint + embedded tests)
         run: chainhunter validate -v --navigator coverage_layer.json
       - name: Unit + end-to-end tests
@@ -16,6 +16,11 @@ jobs:
         run: |
           python samples/make_demo.py
           chainhunter hunt samples/goad_demo.jsonl -o out
+      - name: Benchmark on real attack recordings (fetched, sha256-verified)
+        run: |
+          python datasets/fetch.py --skip-campaigns
+          chainhunter bench -o out/bench.md
+          cat out/bench.md >> "$GITHUB_STEP_SUMMARY"
       - name: Compile rules
         run: |
           chainhunter convert --to kql > out/rules.kql

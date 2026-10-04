@@ -8,9 +8,10 @@ import json
 from datetime import datetime, timezone
 
 from .convert import queries_for
-from .correlate import Chain, risk_of
+from .correlate import ALERT_LEVELS, Chain, risk_of
 from .detect import Detection, Rule
 from .sequence import norm_entity
+from .story import AlertGroup, group_alerts, process_index, process_tree, short_host, show, swimlane
 
 
 def _ts(dt) -> str:
@@ -63,10 +64,14 @@ def markdown_report(chains: list[Chain], registry: dict[str, Rule], title: str =
         if seqs:
             out.append(f"{len(seqs)} multi-stage sequence rule(s) confirmed ordered attacker activity, "
                        f"raising confidence that this is a single coordinated intrusion rather than unrelated alerts.")
+        groups = group_alerts(c)
+        story = [g for g in groups if g.level in ALERT_LEVELS] or groups
+        context = [g for g in groups if g not in story]
         out += ["", "#### Key Findings"]
-        for d in c.detections:
-            out.append(f"- {_ts(d.time)} — **{d.rule.title}**{_kind_label(d)} on `{d.host or 'n/a'}` "
-                       f"(actor `{d.actor or 'n/a'}`, source `{d.source or 'n/a'}`)")
+        for g in story:
+            d = g.detections[0]
+            out.append(f"- {_ts(g.first)} — **{g.rule.title}**{_kind_label(d)} on `{short_host(g.host) or 'n/a'}`"
+                       f"{f' (×{g.count})' if g.count > 1 else ''} — {g.level}")
         flagged = [r for r in c.risk if r.flagged]
         out += ["", "#### Immediate Actions"]
         for r in flagged:
@@ -90,7 +95,8 @@ def markdown_report(chains: list[Chain], registry: dict[str, Rule], title: str =
             out.append(f"- Targeted accounts: {', '.join(sorted(ents['targeted']))}")
         out += ["", "#### Evidence Sources & Analysis", ""]
 
-        for step, d in enumerate(c.detections, 1):
+        for step, g in enumerate(story, 1):
+            d = g.detections[0]
             out += [f"##### Step {step} — {d.rule.title}{_kind_label(d)}", f"**Objective:** {d.rule.description}", ""]
             if d.rule.kind == "sequence":
                 out.append("**Sequence stages:**")
@@ -103,20 +109,24 @@ def markdown_report(chains: list[Chain], registry: dict[str, Rule], title: str =
             if d.rule.kind == "anomaly":
                 detail = " " + ", ".join(f"{k}={v}" for k, v in d.extra.items() if k != "queries")
             out += ["", f"_Figure {n}.{step} - {d.rule.title} evidence (attach screenshot)_", "",
-                    f"**Finding:** {len(d.events)} event(s) from {_ts(d.time)} to {_ts(d.end)} on `{d.host or 'n/a'}`; "
-                    f"actor `{d.actor or 'n/a'}`, source `{d.source or 'n/a'}`.{detail}", "",
+                    f"**Finding:** {g.count} detection(s), {len(g.events)} event(s) from {_ts(g.first)} to {_ts(g.last)} "
+                    f"on `{g.host or 'n/a'}`; actor(s) `{', '.join(show(a) for a in g.actors[:5]) or 'n/a'}`.{detail}", "",
                     f"**Kill Chain Phase:** {d.rule.meta.get('kill_chain', 'Unknown')} · "
                     f"**MITRE ATT&CK:** {', '.join(d.rule.attack_ids) or 'n/a'}", ""]
+        if context:
+            out += ["#### Low / informational context", "", "| First seen | Alert | Host | Count |", "|---|---|---|---|"]
+            out += [f"| {_ts(g.first)} | {g.rule.title} | {short_host(g.host)} | {g.count} |" for g in context]
+            out.append("")
 
         out += ["### Indicators of Compromise", "", "| Type | Value | Context |", "|---|---|---|"]
         out += [f"| {_ioc_type(s)} | `{s}` | Origin of malicious activity |" for s in sorted(ents["sources"])]
         out += [f"| Account | `{a}` | Used during intrusion |" for a in sorted(ents["accounts"])]
         out += [f"| Host | `{h}` | Affected system |" for h in sorted(ents["hosts"])]
         out += ["", "### Appendix: Technical Timeline", "",
-                "| Time (UTC) | Host | Event | Phase | ATT&CK |", "|---|---|---|---|---|"]
-        for d in c.detections:
-            out.append(f"| {_ts(d.time)} | {d.host} | {d.rule.title}{_kind_label(d)} | "
-                       f"{d.rule.meta.get('kill_chain', '')} | {', '.join(d.rule.attack_ids)} |")
+                "| First seen (UTC) | Host | Alert | Count | Phase | ATT&CK |", "|---|---|---|---|---|---|"]
+        for g in story:
+            out.append(f"| {_ts(g.first)} | {short_host(g.host)} | {g.rule.title}{_kind_label(g.detections[0])} | "
+                       f"{g.count} | {g.rule.meta.get('kill_chain', '')} | {', '.join(g.rule.attack_ids)} |")
         out.append("")
     return "\n".join(out)
 
@@ -125,11 +135,32 @@ def markdown_report(chains: list[Chain], registry: dict[str, Rule], title: str =
 
 _CSS = """
 :root{--bg:#f6f5f1;--fg:#1c1b19;--muted:#6c6a63;--card:#fff;--line:#e3e1da;--accent:#b4232a;
---src:#b4232a;--acct:#a15c00;--host:#1f5fa8;--seq:#6b3fa0;--chip:#f0eee8}
+--src:#b4232a;--acct:#a15c00;--host:#1f5fa8;--seq:#6b3fa0;--chip:#f0eee8;
+--crit:#b4232a;--high:#d9480f;--med:#b58100;--low:#9c9a92;--hit:#fdf0ec}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#131312;--fg:#ebe9e3;--muted:#9c9a92;
---card:#1d1c1a;--line:#33322e;--accent:#ff6b6b;--src:#ff6b6b;--acct:#f0a53a;--host:#6aa5ff;--seq:#b48cf0;--chip:#262522}}
+--card:#1d1c1a;--line:#33322e;--accent:#ff6b6b;--src:#ff6b6b;--acct:#f0a53a;--host:#6aa5ff;--seq:#b48cf0;--chip:#262522;
+--crit:#ff5c5c;--high:#ff8c42;--med:#e6b422;--low:#6c6a63;--hit:#2b1d1a}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,sans-serif}
-main{max-width:1040px;margin:0 auto;padding:28px 16px 64px}h1{margin:0;font-size:26px}h2{margin:0 0 4px;font-size:20px}
+main{max-width:1440px;margin:0 auto;padding:28px 24px 64px}h1{margin:0;font-size:28px}h2{margin:0 0 4px;font-size:22px}
+h4{margin:14px 0 4px;font-size:14px}
+svg.lane{width:100%;height:auto;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.lanebg{fill:var(--chip)}.lanelbl{fill:var(--fg);font-size:13px;font-weight:600}.tick{stroke:var(--line)}
+.ticklbl{fill:var(--muted);font-size:11px}.hop{stroke:var(--accent);stroke-width:1.5;stroke-dasharray:3 3}
+.hoplbl{fill:var(--accent);font-size:11px}circle{stroke:var(--bg);stroke-width:1}
+.grid2{display:grid;grid-template-columns:3fr 2fr;gap:20px;align-items:start}
+@media (max-width:1000px){.grid2{grid-template-columns:1fr}}
+.ptree,.ptree ul{list-style:none;margin:0;padding-left:22px;border-left:1px dashed var(--line)}
+.ptree{padding-left:6px;border:0}.proc{padding:6px 10px;margin:4px 0;border-radius:8px;border:1px solid var(--line);background:var(--card)}
+.proc.hit{background:var(--hit);border-color:var(--accent)}.cmd{font:12px/1.4 ui-monospace,Consolas,monospace;color:var(--muted);word-break:break-all}
+.badge{display:inline-block;font-size:11px;font-weight:600;border-radius:4px;padding:0 6px;margin:2px 0 0 6px;color:#fff}
+.badge.critical{background:var(--crit)}.badge.high{background:var(--high)}.badge.medium{background:var(--med)}
+.badge.low,.badge.informational{background:var(--low)}
+.filters{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:8px 0 10px;font-size:14px}
+.filters input[type=search],.filters select{font:inherit;padding:5px 9px;border-radius:7px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+.ai{border:1px solid var(--line);border-radius:10px;padding:4px 16px 10px;background:var(--card)}
+.ai li{margin:4px 0}.ai li.bad{color:var(--muted)}.cite{font:12px ui-monospace,Consolas,monospace;color:var(--host);cursor:help}
+tr.grp td{vertical-align:top}.lvl{font-weight:700;text-transform:capitalize}
+.lvl.critical{color:var(--crit)}.lvl.high{color:var(--high)}.lvl.medium{color:var(--med)}.lvl.low,.lvl.informational{color:var(--low)}
 h3{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:22px 0 8px}
 .muted{color:var(--muted)}.chain{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin:22px 0}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.chip{background:var(--chip);border-radius:999px;padding:2px 10px;font-size:13px}
@@ -152,6 +183,15 @@ th{color:var(--muted);font-weight:600}.flag{color:var(--accent);font-weight:700}
 """
 
 _JS = """
+document.querySelectorAll('.chain').forEach(sec=>{
+  const q=sec.querySelector('.f-text'),h=sec.querySelector('.f-host'),boxes=[...sec.querySelectorAll('.f-lvl')];
+  if(!q)return;
+  const apply=()=>{const lv=new Set(boxes.filter(b=>b.checked).map(b=>b.value)),t=q.value.toLowerCase(),hv=h.value;
+    let n=0;sec.querySelectorAll('tr.grp').forEach(r=>{const ok=lv.has(r.dataset.level)&&(!hv||r.dataset.host===hv)&&
+      (!t||r.dataset.text.includes(t));r.style.display=ok?'':'none';const d=r.nextElementSibling;if(d&&d.classList.contains('grp-d'))d.style.display=ok?'':'none';if(ok)n++;});
+    sec.querySelector('.f-count').textContent=n+' alert groups shown';};
+  [q,h,...boxes].forEach(x=>x.addEventListener('input',apply));apply();
+});
 document.querySelectorAll('svg.graph').forEach(svg=>{
   const sec=svg.closest('.chain');let active=null;
   svg.querySelectorAll('.node').forEach(n=>n.addEventListener('click',()=>{
@@ -163,26 +203,34 @@ document.querySelectorAll('svg.graph').forEach(svg=>{
 """
 
 
-def _graph(c: Chain) -> str:
+def _graph(c: Chain, per_column: int = 10) -> str:
     e = html.escape
     cols = {"source": [], "actor": [], "host": []}
     labels: dict[str, str] = {}
     edges: dict[tuple[str, str], set[str]] = {}
+    # big incidents: keep the highest-risk entities per column so the graph stays readable
+    keep = {}
+    for r in c.risk:
+        kind = {"Account": "actor", "Source": "source", "Host": "host"}[r.kind]
+        if sum(1 for k in keep.values() if k == kind) < per_column:
+            keep[f"{kind}:{norm_entity(r.value, kind)}"] = kind
 
     def key(kind, v):
         k = f"{kind}:{norm_entity(v, kind)}"
+        if k not in keep:
+            return None
         if k not in labels:
             labels[k] = v
             cols[kind].append(k)
         return k
 
     for d in c.detections:
-        if d.rule.kind == "sequence":
+        if d.rule.kind == "sequence" or d.rule.level not in ALERT_LEVELS:
             continue
         s = key("source", d.source) if d.source else None
         a = key("actor", d.actor) if d.actor else None
         h = key("host", d.host) if d.host else None
-        tech = ",".join(d.rule.attack_ids[:1]) or d.rule.id
+        tech = ",".join(d.rule.attack_ids[:1]) or d.rule.title[:28]
         for x, y in ((s, a), (a, h)) if a else ((s, h),):
             if x and y:
                 edges.setdefault((x, y), set()).add(tech)
@@ -226,58 +274,95 @@ def _graph(c: Chain) -> str:
     return "".join(parts)
 
 
-def _det_keys(d: Detection) -> str:
-    ks = [f"{k}:{norm_entity(getattr(d, k), k)}" for k in ("source", "actor", "host") if getattr(d, k)]
-    ks += [f"{k}:{norm_entity(v, k)}" for k, v in d.extra.get("entities", [])]
-    return "|".join(dict.fromkeys(ks))
-
-
 def _evjson(events: list[dict], limit=12) -> str:
     rows = [{k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in ev.items()} for ev in events[:limit]]
     more = f"\n... {len(events) - limit} more" if len(events) > limit else ""
     return json.dumps(rows, indent=2, default=str) + more
 
 
-def html_report(chains: list[Chain], registry: dict[str, Rule], stats: dict | None = None) -> str:
+def _alert_table(c: Chain, groups: list[AlertGroup], registry: dict[str, Rule]) -> str:
+    e = html.escape
+    hosts = sorted({short_host(g.host) for g in groups if g.host})
+    levels = ["critical", "high", "medium", "low", "informational"]
+    p = ["<div class='filters'><input type='search' class='f-text' placeholder='Search rule, host, account…'>"
+         "<select class='f-host'><option value=''>All hosts</option>"
+         + "".join(f"<option>{e(h)}</option>" for h in hosts) + "</select>"
+         + "".join(f"<label><input type='checkbox' class='f-lvl' value='{l}' {'checked' if l in ALERT_LEVELS else ''}> "
+                   f"{l}</label>" for l in levels)
+         + "<span class='muted f-count'></span></div><div class='tbl'><table>"
+         "<tr><th>First seen</th><th>Severity</th><th>Alert</th><th>Host</th><th>Count</th><th>Phase · ATT&amp;CK</th></tr>"]
+    for g in groups:
+        text = " ".join([g.rule.title, g.host, *g.actors, g.rule.meta.get("kill_chain", ""), *g.rule.attack_ids]).lower()
+        tag = f" <span class='tag {g.rule.kind}'>{g.rule.kind.upper()}</span>" if g.rule.kind != "signature" else ""
+        p.append(f"<tr class='grp' data-level='{e(g.level)}' data-host='{e(short_host(g.host))}' data-text='{e(text)}'>"
+                 f"<td class='muted'>{e(g.first.strftime('%H:%M:%S'))}</td><td class='lvl {e(g.level)}'>{e(g.level)}</td>"
+                 f"<td><b>{e(g.rule.title)}</b>{tag}<div class='muted'>{e(', '.join(show(a) for a in g.actors[:3]))}</div></td>"
+                 f"<td>{e(short_host(g.host) or 'n/a')}</td><td>{g.count}"
+                 + (f"<div class='muted'>until {e(g.last.strftime('%H:%M:%S'))}</div>" if g.count > 1 else "")
+                 + f"</td><td>{e(g.rule.meta.get('kill_chain', ''))}<div class='muted'>{e(', '.join(g.rule.attack_ids[:3]))}</div></td></tr>")
+        qs = _queries(g.detections[0], registry)
+        body = f"<p>{e(g.rule.description)}</p>" if g.rule.description else ""
+        if g.rule.kind == "sequence":
+            d = g.detections[0]
+            body += "<p class='muted'>" + " → ".join(f"{e(sid)} ({e(sd.time.strftime('%H:%M:%S'))})" for sid, sd in d.extra["steps"]) + "</p>"
+        if qs:
+            body += "<details><summary>Hunting queries</summary>" + "".join(
+                f"<pre>{e(lang.upper())}\n{e(q)}</pre>" for lang, q in qs.items()) + "</details>"
+        body += (f"<details><summary>Raw log events ({len(g.events)})</summary>"
+                 f"<pre>{e(show(_evjson(g.events, 6)))}</pre></details>")
+        p.append(f"<tr class='grp-d'><td></td><td colspan='5'><details><summary>Details, queries &amp; raw logs"
+                 f"</summary>{body}</details></td></tr>")
+    p.append("</table></div>")
+    return "".join(p)
+
+
+def html_report(chains: list[Chain], registry: dict[str, Rule], stats: dict | None = None,
+                events: list[dict] | None = None, ai: dict[int, str] | None = None) -> str:
     e = html.escape
     stats = stats or {}
+    pidx = process_index(events or [])
     p = [f"<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' "
          f"content='width=device-width,initial-scale=1'><title>ChainHunter Report</title><style>{_CSS}</style></head>"
          f"<body><main><h1>ChainHunter</h1><p class='muted'>Correlated attack chains · generated "
          f"{e(_ts(datetime.now(timezone.utc)))}</p><div class='stats'>"]
-    for label, val in (("Events", stats.get("events", "—")), ("Detections", stats.get("detections", "—")),
+    for label, val in (("Events analysed", stats.get("events", "—")), ("Raw detections", stats.get("detections", "—")),
                        ("Sequences", stats.get("sequences", "—")), ("Anomalies", stats.get("anomalies", "—")),
                        ("Incidents", len(chains))):
-        p.append(f"<div class='stat'><b>{e(str(val))}</b><span class='muted'>{label}</span></div>")
+        p.append(f"<div class='stat'><b>{e(f'{val:,}' if isinstance(val, int) else str(val))}</b>"
+                 f"<span class='muted'>{label}</span></div>")
     p.append("</div>")
     for n, c in enumerate(chains, 1):
+        groups = group_alerts(c)
+        alerting = [g for g in groups if g.level in ALERT_LEVELS]
+        hosts = sorted({short_host(h) for h in c.entities["hosts"]})
         p.append(f"<section class='chain'><h2>Incident {n} · <span class='sev'>{c.severity}</span> "
-                 f"<span class='muted'>score {c.score}</span></h2><div class='muted'>{e(_ts(c.start))} → {e(_ts(c.end))} · "
-                 f"confidence {e(c.confidence)}</div><div class='chips'>")
+                 f"<span class='muted'>score {c.score:,}</span></h2><div class='muted'>{e(_ts(c.start))} → {e(_ts(c.end))} · "
+                 f"confidence {e(c.confidence)} · {len(hosts)} host(s): {e(', '.join(hosts))} · "
+                 f"{len(c.detections):,} detections in {len(groups)} alert groups ({len(alerting)} medium+)</div>"
+                 f"<h3>Kill chain</h3><div class='chips'>")
         p += [f"<span class='chip'>{i + 1}. {e(ph)}</span>" for i, ph in enumerate(c.phases)]
-        p.append("</div><h3>Attack graph <span class='muted' style='text-transform:none;letter-spacing:0'>"
-                 "— click a node to focus</span></h3>")
+        p.append("</div>")
+        if ai and (n - 1) in ai:
+            p.append(ai[n - 1])
+        p.append("<h3>Alerts over time, by host <span class='muted' style='text-transform:none;letter-spacing:0'>"
+                 "— hover a dot; dashed markers show where the intrusion reached a new host</span></h3>")
+        p.append(swimlane(c))
+        p.append("<div class='grid2'><div><h3>Entity graph <span class='muted' style='text-transform:none;"
+                 "letter-spacing:0'>— click a node to focus</span></h3>")
         p.append(_graph(c))
-        p.append("<h3>Entity risk (RBA)</h3><div class='tbl'><table><tr><th>Entity</th><th>Type</th><th>Risk</th>"
-                 "<th>Techniques</th><th>Flag</th></tr>")
-        for r in c.risk[:10]:
-            p.append(f"<tr><td><code>{e(r.value)}</code></td><td>{r.kind}</td><td>{r.score}</td>"
-                     f"<td>{e(', '.join(sorted(r.techniques)))}</td><td>{'<span class=flag>FLAGGED</span>' if r.flagged else ''}</td></tr>")
-        p.append("</table></div><h3>Timeline</h3>")
-        for d in c.detections:
-            tag = f"<span class='tag {d.rule.kind}'>{d.rule.kind.upper()}</span>" if d.rule.kind != "signature" else ""
-            p.append(f"<div class='ev' data-keys='{e(_det_keys(d))}'><div class='muted'>{e(_ts(d.time))}</div><div>"
-                     f"<b>{e(d.rule.title)}{tag}</b><code>{e(d.host or 'n/a')}</code> · actor <code>{e(d.actor or 'n/a')}</code>"
-                     f" · source <code>{e(d.source or 'n/a')}</code><div class='muted'>{e(d.rule.meta.get('kill_chain', ''))} · "
-                     f"{e(', '.join(d.rule.attack_ids))} · {len(d.events)} event(s) · risk +{risk_of(d)}</div>")
-            if d.rule.kind == "sequence":
-                p.append("<div class='muted'>" + " → ".join(f"{e(sid)} ({e(sd.time.strftime('%H:%M:%S'))})"
-                                                            for sid, sd in d.extra["steps"]) + "</div>")
-            qs = _queries(d, registry)
-            if qs:
-                p.append("<details><summary>Hunting queries</summary>" +
-                         "".join(f"<pre>{e(lang.upper())}\n{e(q)}</pre>" for lang, q in qs.items()) + "</details>")
-            p.append(f"<details><summary>Raw evidence ({len(d.events)})</summary><pre>{e(_evjson(d.events))}</pre></details></div></div>")
+        p.append("</div><div><h3>Entity risk (RBA)</h3><div class='tbl'><table><tr><th>Entity</th><th>Type</th>"
+                 "<th>Risk</th><th>Techniques</th><th>Flag</th></tr>")
+        for r in c.risk[:12]:
+            techs = sorted(r.techniques)
+            p.append(f"<tr><td><code>{e(show(r.value))}</code></td><td>{r.kind}</td><td>{r.score:,}</td>"
+                     f"<td title='{e(', '.join(techs))}'>{len(techs)}</td>"
+                     f"<td>{'<span class=flag>FLAGGED</span>' if r.flagged else ''}</td></tr>")
+        p.append("</table></div></div></div>")
+        tree = process_tree(c, pidx)
+        if tree:
+            p.append("<h3>Process tree <span class='muted' style='text-transform:none;letter-spacing:0'>"
+                     "— rebuilt from Sysmon ProcessGuid lineage</span></h3>" + tree)
+        p.append("<h3>Alert groups</h3>" + _alert_table(c, groups, registry))
         p.append("</section>")
     p.append(f"</main><script>{_JS}</script></body></html>")
     return "".join(p)

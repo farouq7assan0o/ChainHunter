@@ -1,0 +1,36 @@
+title: LSASS Opened with Credential-Read Access Rights
+id: ch-0007
+status: stable
+description: >
+  Identify a process opening LSASS with access masks used by credential dumpers (PROCESS_VM_READ
+  combinations such as 0x1010 for Mimikatz sekurlsa, 0x1fffff for ProcDump), excluding the OS and
+  security components that legitimately inspect LSASS.
+references:
+  - https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES (sysmon_10_lsass_mimikatz_sekurlsa_logonpasswords, sysmon_10_11_lsass_memdump)
+tags: [attack.credential_access, attack.t1003.001]
+level: high
+logsource: {product: windows, category: process_access}
+detection:
+  selection:
+    TargetImage|endswith: '\lsass.exe'
+    GrantedAccess: ['0x1010', '0x1410', '0x1438', '0x143a', '0x1418', '0x1f0fff', '0x1f1fff', '0x1f2fff', '0x1f3fff', '0x1fffff']
+  filter_os:
+    SourceImage|endswith: ['\System32\csrss.exe', '\System32\wininit.exe', '\System32\lsm.exe', '\System32\wbem\WmiPrvSE.exe', '\System32\svchost.exe']
+  filter_av:
+    - SourceImage|endswith: ['\MsMpEng.exe', '\MsSense.exe', '\vmtoolsd.exe']
+    - SourceImage|contains: '\Windows Defender\'
+  condition: selection and not 1 of filter_*
+falsepositives:
+  - Third-party AV/EDR agents and backup products (add their exact image paths to a filter)
+chainhunter:
+  kill_chain: Credential Access
+  actor_field: [SourceUser, User]
+  source_field: SourceImage
+tests:
+  match:
+    - {EventID: 10, SourceImage: 'C:\Users\IEUser\Desktop\mimikatz_trunk\Win32\mimikatz.exe', TargetImage: 'C:\Windows\system32\lsass.exe', GrantedAccess: '0x1010'}
+    - {EventID: 10, SourceImage: 'C:\Users\IEUser\Desktop\procdump.exe', TargetImage: 'C:\Windows\system32\lsass.exe', GrantedAccess: '0x1fffff'}
+  nomatch:
+    - {EventID: 10, SourceImage: 'C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.2008.9-0\MsMpEng.exe', TargetImage: 'C:\Windows\system32\lsass.exe', GrantedAccess: '0x1410'}
+    - {EventID: 10, SourceImage: 'C:\Windows\System32\wbem\WmiPrvSE.exe', TargetImage: 'C:\Windows\system32\lsass.exe', GrantedAccess: '0x1410'}
+    - {EventID: 10, SourceImage: 'C:\Tools\x.exe', TargetImage: 'C:\Windows\system32\lsass.exe', GrantedAccess: '0x1000'}

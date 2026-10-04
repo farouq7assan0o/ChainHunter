@@ -28,6 +28,37 @@ import yaml
 SUPPORTED_MODIFIERS = {"contains", "startswith", "endswith", "re", "cidr", "all", "windash"}
 
 # Sigma logsource category -> event IDs it implies (Sysmon + native Security equivalents)
+TACTICS = {t.lower().replace(" ", "_"): t for t in (
+    "Reconnaissance", "Resource Development", "Initial Access", "Execution", "Persistence",
+    "Privilege Escalation", "Defense Evasion", "Stealth", "Defense Impairment",  # ATT&CK v18 split DE in two
+    "Credential Access", "Discovery", "Lateral Movement",
+    "Collection", "Command and Control", "Exfiltration", "Impact")}
+
+# Sigma logsource service -> event log channel(s), lower-case
+SERVICE_CHANNELS = {
+    "security": {"security"},
+    "system": {"system"},
+    "application": {"application"},
+    "sysmon": {"microsoft-windows-sysmon/operational"},
+    "powershell": {"microsoft-windows-powershell/operational", "powershellcore/operational"},
+    "powershell-classic": {"windows powershell"},
+    "taskscheduler": {"microsoft-windows-taskscheduler/operational"},
+    "wmi": {"microsoft-windows-wmi-activity/operational"},
+    "windefend": {"microsoft-windows-windows defender/operational"},
+    "dns-server": {"dns server"},
+    # cloud (Microsoft Sentinel table names, lower-case; see cloud.py)
+    "auditlogs": {"auditlogs"},
+    "signinlogs": {"signinlogs", "aadnoninteractiveusersigninlogs"},
+    "activitylogs": {"azureactivity"},
+    "riskdetection": {"aaduserriskevents"},
+    "pim": {"auditlogs"},
+    "audit": {"officeactivity"},
+    "exchange": {"officeactivity"},
+    "threat_management": {"securityalert"},
+    "threat_detection": {"securityalert"},
+}
+CLOUD_PRODUCTS = {"azure", "m365"}
+
 LOGSOURCE_EVENTS = {
     "process_creation": [1, 4688],
     "network_connection": [3],
@@ -50,6 +81,13 @@ LOGSOURCE_EVENTS = {
     "file_delete": [23, 26],
     "ps_script": [4104],
     "ps_module": [4103],
+    "ps_classic_start": [400],
+    "ps_classic_provider_start": [600],
+    "file_change": [2],
+    "sysmon_status": [4, 16],
+    "process_tampering": [25],
+    "file_executable_detected": [29],
+    "sysmon_error": [255],
 }
 
 
@@ -98,6 +136,19 @@ class Detection:
         if fname in ("actor", "host", "source"):
             v = getattr(self, fname)
             return {v} if v else set()
+        if fname == "domain":
+            # DNS domain of the host FQDN and of any user principal (user@domain). Lets a sequence link an
+            # on-prem federation server (ADFS01.corp.com) to cloud activity by a forged corp.com identity -
+            # the case where no account, IP or host is shared (Golden SAML).
+            out = set()
+            h = self.host or ""
+            if h.count(".") >= 2 and not h.replace(".", "").isdigit():
+                out.add(h.split(".", 1)[1].lower())
+            for v in [self.actor] + [e.get(f) for e in self.events for f in ("User", "AccountUpn", "UserPrincipalName",
+                                                                                "InitiatingProcessAccountUpn", "UserId")]:
+                if v and "@" in str(v):
+                    out.add(str(v).rsplit("@", 1)[1].lower())
+            return out
         return {str(e[fname]) for e in self.events if e.get(fname) not in (None, "", "-")}
 
 
@@ -126,7 +177,17 @@ def load_rule_file(f: Path) -> Rule | None:
         if isinstance(detection.get("condition"), list):
             detection["condition"] = " or ".join(f"({c})" for c in detection["condition"])
         _check_modifiers(detection, f)
-    meta = doc.get("chainhunter", {})
+        category = (doc.get("logsource") or {}).get("category")
+        if category and category not in LOGSOURCE_EVENTS:
+            # an unmapped category would run against *every* event (e.g. a file rule matching network events)
+            raise ValueError(f"unsupported logsource category '{category}' (needs ETW/other telemetry)")
+    meta = dict(doc.get("chainhunter", {}))
+    if "kill_chain" not in meta:  # SigmaHQ rules: derive the phase from their ATT&CK tactic tag
+        for t in doc.get("tags", []) or []:
+            tactic = TACTICS.get(str(t).lower().removeprefix("attack.").replace("-", "_"))
+            if tactic:
+                meta["kill_chain"] = tactic
+                break
     if kind == "sequence":
         meta = {**meta, "sequence": doc["sequence"]}
     return Rule(
@@ -137,19 +198,25 @@ def load_rule_file(f: Path) -> Rule | None:
     )
 
 
-def load_rules(*dirs: Path, quiet: bool = False) -> list[Rule]:
-    rules, seen = [], set()
+def load_rules(*dirs: Path, quiet: bool = False, verbose: bool = False) -> list[Rule]:
+    rules, seen, skipped = [], set(), []
     for d in dirs:
         for f in sorted(d.rglob("*.yml")) + sorted(d.rglob("*.yaml")):
             try:
                 r = load_rule_file(f)
             except Exception as e:  # skip rules using unsupported Sigma features, keep going
-                if not quiet:
-                    print(f"[!] skipped {f.name}: {e}", file=sys.stderr)
+                skipped.append(f"{f.name}: {e}")
                 continue
             if r and r.id not in seen:
                 seen.add(r.id)
                 rules.append(r)
+    if skipped and not quiet:
+        if verbose:
+            for s in skipped:
+                print(f"[!] skipped {s}", file=sys.stderr)
+        else:
+            print(f"[i] loaded {len(rules)} rules; skipped {len(skipped)} that need unsupported Sigma "
+                  f"features or telemetry (--list-skipped to see them)", file=sys.stderr)
     return rules
 
 
@@ -271,7 +338,38 @@ def eval_ast(node, results: dict[str, bool]) -> bool:
 _AST_CACHE: dict[str, tuple] = {}
 
 
+def _channel_ok(rule: Rule, event: dict) -> bool:
+    """Enforce Sigma `logsource.service` against the event's channel. Without this, a rule written for the
+    Application log (e.g. AV keyword matches) fires on any Sysmon/Security event containing the keyword."""
+    service = str(rule.logsource.get("service", "")).lower()
+    channel = str(event.get("Channel", ""))
+    eid = event.get("EventID")
+    # platform: cloud rules only see cloud events, Windows rules never see them (a Windows keyword rule
+    # would otherwise fire on an Entra ID record that happens to contain the word)
+    product = str(rule.logsource.get("product", "")).lower()
+    plat = event.get("_platform")
+    if product in CLOUD_PRODUCTS:
+        if plat not in (product, "m365d" if product == "m365" else None):
+            return False
+    elif plat and product not in ("", plat):
+        return False
+    if (rule.logsource.get("category") and channel and isinstance(eid, int) and (eid <= 29 or eid == 255)
+            and "sysmon" not in channel.lower()):
+        # category rules mean Sysmon for these IDs; found on real APT29 data: a Sysmon WMI rule (EID 20/21)
+        # fired on Kernel-Boot and TerminalServices events that reuse the same numbers
+        return False
+    if not service or not channel:
+        return True  # nothing to enforce (e.g. synthetic/test events without a channel)
+    known = SERVICE_CHANNELS.get(service)
+    if known:
+        return channel.lower() in known
+    squash = lambda s: s.lower().replace("-", "").replace(" ", "").replace("/", "")
+    return squash(service) in squash(channel)
+
+
 def rule_matches(rule: Rule, event: dict) -> bool:
+    if not _channel_ok(rule, event):
+        return False
     if rule.event_ids and not any(k.split("|")[0] == "EventID" for s in rule.detection.values() if isinstance(s, dict) for k in s):
         if event.get("EventID") not in rule.event_ids:
             return False
@@ -311,7 +409,9 @@ def apply_threshold(rule: Rule, hits: list[dict], thr: dict, meta: dict | None =
         i = 0
         while i < len(evs):
             burst = [e for e in evs[i:] if e["TimeCreated"] - evs[i]["TimeCreated"] <= window]
-            if len(burst) >= thr["count"]:
+            # `distinct: Field` counts unique values (e.g. spray = many *different* accounts), not raw events
+            size = len({str(e.get(thr["distinct"], "")).lower() for e in burst}) if thr.get("distinct") else len(burst)
+            if size >= thr["count"]:
                 out.append(build_detection(rule, burst, meta))
                 i += len(burst)
             else:
@@ -319,12 +419,72 @@ def apply_threshold(rule: Rule, hits: list[dict], thr: dict, meta: dict | None =
     return out
 
 
+def _sel_eids(sel) -> set[int] | None:
+    """EventIDs a selection can match, or None if it doesn't pin EventID (matches any)."""
+    maps = sel if isinstance(sel, list) else [sel]
+    if not maps or not all(isinstance(m, dict) for m in maps):
+        return None
+    out: set[int] = set()
+    for m in maps:
+        vals = [v for k, v in m.items() if k.split("|")[0] == "EventID" and len(k.split("|")) == 1]
+        if not vals:
+            return None
+        for v in vals[0] if isinstance(vals[0], list) else [vals[0]]:
+            try:
+                out.add(int(v))
+            except (TypeError, ValueError):
+                return None
+    return out
+
+
+def _ast_eids(node, sels: dict[str, set[int] | None]) -> set[int] | None:
+    """Over-approximate the EventIDs a condition can match; None = unconstrained. Never under-approximates,
+    so indexing can only skip events the rule could not have matched."""
+    op = node[0]
+    if op == "ref":
+        return sels.get(node[1])
+    if op == "not":
+        return None
+    if op in ("and", "or"):
+        a, b = _ast_eids(node[1], sels), _ast_eids(node[2], sels)
+        if op == "and":
+            return b if a is None else a if b is None else a & b
+        return None if a is None or b is None else a | b
+    parts = [v for k, v in sels.items() if fnmatch.fnmatchcase(k, node[1])]
+    if op == "any":
+        return None if not parts or any(p is None for p in parts) else set().union(*parts)
+    known = [p for p in parts if p is not None]
+    return set.intersection(*known) if known else None
+
+
+def candidate_eids(rule: Rule) -> set[int] | None:
+    det = rule.detection
+    has_eid = any(k.split("|")[0] == "EventID" for s in det.values() if isinstance(s, dict) for k in s)
+    if rule.event_ids and not has_eid:
+        return set(rule.event_ids)
+    sels = {k: _sel_eids(v) for k, v in det.items() if k != "condition"}
+    try:
+        return _ast_eids(parse_condition(det["condition"]), sels)
+    except Exception:
+        return None
+
+
 def run(rules: list[Rule], events: list[dict]) -> list[Detection]:
+    """Match rules against events via an EventID index, the way a SIEM uses indexed fields: a process-creation
+    rule only ever scans process-creation events. On 196k real APT29 events x 2,400 rules this is the difference
+    between hours and minutes."""
+    by_eid: dict[int, list[dict]] = {}
+    for e in events:
+        by_eid.setdefault(e.get("EventID"), []).append(e)
     detections: list[Detection] = []
     for rule in rules:
         if rule.kind != "signature":
             continue
-        hits = [e for e in events if rule_matches(rule, e)]
+        eids = candidate_eids(rule)
+        pool = events if eids is None else [e for eid in eids for e in by_eid.get(eid, ())]
+        hits = [e for e in pool if rule_matches(rule, e)]
+        if eids is not None and len(eids) > 1:
+            hits.sort(key=lambda e: e["TimeCreated"])
         if not hits:
             continue
         thr = rule.meta.get("threshold")
