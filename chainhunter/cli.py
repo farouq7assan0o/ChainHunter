@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -50,6 +51,39 @@ def _aux_eids(rules) -> set[int]:
             if "detection" in step:
                 eids |= candidate_eids(_inline_rule(r, step)) or set()
     return eids
+
+
+def _export(a, chains) -> None:
+    """--export thehive,misp,stix writes files; --push-thehive / --push-misp also POST (keys from env vars)."""
+    want = {x.strip().lower() for x in (a.export or "").split(",") if x.strip()}
+    if a.push_thehive:
+        want.add("thehive")
+    if a.push_misp:
+        want.add("misp")
+    if not want or not chains:
+        return
+    unknown = want - {"thehive", "misp", "stix"}
+    if unknown:
+        raise SystemExit(f"[x] unknown --export format(s): {', '.join(sorted(unknown))} (use thehive, misp, stix)")
+    from . import export as ex
+    if "thehive" in want:
+        alerts = [ex.thehive_alert(c, a.title) for c in chains]
+        (a.out / "thehive_alerts.json").write_text(json.dumps(alerts, indent=1, ensure_ascii=False), encoding="utf-8")
+        print(f"[+] TheHive: {len(alerts)} alert(s) -> {a.out / 'thehive_alerts.json'}")
+        if a.push_thehive:
+            for line in ex.push_thehive(a.push_thehive, alerts):
+                print(f"    TheHive {line}")
+    if "misp" in want:
+        events = [ex.misp_event(c, a.title) for c in chains]
+        (a.out / "misp_events.json").write_text(json.dumps(events, indent=1, ensure_ascii=False), encoding="utf-8")
+        print(f"[+] MISP: {len(events)} event(s) -> {a.out / 'misp_events.json'}")
+        if a.push_misp:
+            for line in ex.push_misp(a.push_misp, events):
+                print(f"    MISP {line}")
+    if "stix" in want:
+        bundle = ex.stix_bundle(chains, a.title)
+        (a.out / "stix_bundle.json").write_text(json.dumps(bundle, indent=1, ensure_ascii=False), encoding="utf-8")
+        print(f"[+] STIX 2.1: {len(bundle['objects'])} object(s) -> {a.out / 'stix_bundle.json'}")
 
 
 def cmd_hunt(a) -> int:
@@ -118,6 +152,7 @@ def cmd_hunt(a) -> int:
                       file=sys.stderr)
     (a.out / "report.md").write_text(markdown_report(chains, registry, a.title), encoding="utf-8")
     (a.out / "report.html").write_text(html_report(chains, registry, stats, events, ai_html), encoding="utf-8")
+    _export(a, chains)
     (a.out / "attack_layer.json").write_text(navigator_layer(chains), encoding="utf-8")
     (a.out / "incidents.json").write_text(json_export(chains), encoding="utf-8")
 
@@ -341,6 +376,9 @@ def main(argv=None) -> int:
     h.add_argument("--ai", metavar="BACKEND", help="grounded AI draft: ollama:qwen2.5:3b (local) or claude[:MODEL]")
     h.add_argument("--ai-top", type=int, default=3, help="how many top incidents the AI drafts (default 3)")
     h.add_argument("--suppress", type=Path, metavar="FILE", help="analyst false-positive suppressions (YAML)")
+    h.add_argument("--export", metavar="FORMATS", help="write incidents as thehive,misp,stix (comma-separated)")
+    h.add_argument("--push-thehive", metavar="URL", help="also POST alerts to TheHive 5 (key: THEHIVE_API_KEY env var)")
+    h.add_argument("--push-misp", metavar="URL", help="also POST events to MISP (key: MISP_API_KEY env var)")
     h.set_defaults(fn=cmd_hunt)
 
     v = sub.add_parser("validate", parents=[common], help="lint + test rules, ATT&CK coverage")

@@ -178,6 +178,22 @@ How it's built, and the problems real data forced:
 - **Case-variant fields.** Real APT29 data has both `IpAddress` and `Ipaddress`, which DuckDB rejects as duplicate columns. Variants are merged into one column, and every original spelling stays queryable.
 - **Known limit.** 6 SigmaHQ rules use free-text keyword search with no event-type filter. They'd need a full scan, so lake mode reports them as skipped rather than silently scanning.
 
+## Export to TheHive, MISP and STIX 2.1
+```bash
+python -m chainhunter hunt logs/ -r rules --export thehive,misp,stix            # write files
+python -m chainhunter hunt logs/ -r rules --push-thehive https://thehive:9000   # also POST (key: THEHIVE_API_KEY)
+python -m chainhunter hunt logs/ -r rules --push-misp https://misp.local        # also POST (key: MISP_API_KEY)
+```
+| Format | What you get |
+|---|---|
+| **TheHive 5 alert** | Title, severity, Markdown summary of the alert groups, typed **observables** (IPs, hosts, accounts, files), ATT&CK **procedures** with first-seen times |
+| **MISP event** | Typed attributes (`ip-src`, `hostname`, `target-user`, `filename`), `tlp:amber`, ATT&CK technique tags, summary as a text attribute |
+| **STIX 2.1 bundle** | Report + note, attack-pattern objects with MITRE references, IPv4/IPv6, user-account and file objects; every reference resolves |
+
+- **Re-export-safe:** IDs are deterministic (same incident → same TheHive `sourceRef`, MISP UUID and STIX ids), so re-running doesn't create duplicates.
+- **Keys stay out of shell history:** they only come from environment variables, and nothing is sent without an explicit `--push-*` flag.
+- On the real Golden SAML incident: 1 Critical TheHive alert with 8 observables and 9 ATT&CK procedures, and a 19-object STIX bundle.
+
 ## Public Sigma benchmark (weekly)
 Every Monday, a GitHub Action replays the **latest SigmaHQ release** against the real attack recordings and campaigns, then publishes a trend site to GitHub Pages: detection rate per release, **rules that stopped firing** on a recording (regressions), new detections, and per-campaign results.
 

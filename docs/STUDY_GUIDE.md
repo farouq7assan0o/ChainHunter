@@ -82,6 +82,14 @@ Two rules keep it honest:
 - **The verifier, not the model, decides what's supported.** A sentence fails if it cites nothing, cites a fake ID, or mentions a host, account, IP or ATT&CK ID that isn't in the evidence it cites.
 - *Status:* tested with a fake model. Not yet run against a real local model (see Part D).
 
+### A12. Exporting to SOC tools (TheHive, MISP, STIX)
+- **TheHive** is a case-management platform where analysts work alerts into cases. ChainHunter sends an *alert* with observables and ATT&CK *procedures*, and an analyst promotes it to a case.
+- **MISP** is a threat-intelligence sharing platform. ChainHunter sends an *event* whose attributes (IPs, hosts, accounts) can be shared with other teams or correlated against existing intel. `to_ids` is false, because these are incident artefacts, not vetted blocking indicators.
+- **STIX 2.1** is the vendor-neutral JSON standard for threat intelligence: objects (report, attack-pattern, ipv4-addr, user-account…) linked by IDs. Any STIX-aware tool can import it.
+- **Deterministic IDs:** a hash of the incident's first detection and window, so exporting the same incident twice updates rather than duplicates it.
+- **Keys from environment variables only:** command-line arguments are visible in process lists and shell history.
+- **Interview Q:** "MISP vs TheHive?" → MISP is for *sharing and correlating intelligence* (indicators, events, galaxies). TheHive is for *working incidents* (cases, tasks, observables, analyst workflow). They integrate: TheHive can import MISP events, and export case observables back to MISP.
+
 ---
 
 ## Part B: What real data taught

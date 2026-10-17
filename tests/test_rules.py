@@ -1,4 +1,5 @@
 from collections import Counter
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -419,6 +420,60 @@ def test_defender_xdr_rules_on_real_golden_saml_rows():
         pytest.skip("run datasets/fetch.py first")
     fired_ids = Counter(d.rule.id for d in run(RULES, load([path])))
     assert fired_ids["ch-x001"] == 2 and fired_ids["ch-x002"] == 4 and fired_ids["ch-x003"] == 1
+
+
+def test_exports_thehive_misp_stix_shapes_and_stable_ids(demo_chain):
+    from chainhunter import export as ex
+    alert = ex.thehive_alert(demo_chain)
+    assert alert["severity"] == 4 and alert["source"] == "ChainHunter" and alert["sourceRef"].startswith("chainhunter-")
+    types = {(o["dataType"], o["data"]) for o in alert["observables"]}
+    assert ("ip", "192.168.101.51") in types and ("other", "rickon.stark") in types
+    assert {p["patternId"] for p in alert["procedures"]} >= {"T1558.003", "T1003.006"}
+    assert ex.thehive_alert(demo_chain)["sourceRef"] == alert["sourceRef"]          # deterministic -> no duplicates
+    ev = ex.misp_event(demo_chain)["Event"]
+    assert ev["threat_level_id"] == "1" and {"name": "tlp:amber"} in ev["Tag"]
+    assert {"type": "ip-src", "value": "192.168.101.51"}.items() <= next(a for a in ev["Attribute"] if a["type"] == "ip-src").items()
+    b = ex.stix_bundle([demo_chain])
+    kinds = Counter(o["type"] for o in b["objects"])
+    assert kinds["report"] == 1 and kinds["attack-pattern"] >= 5 and kinds["ipv4-addr"] >= 1
+    ids = {o["id"] for o in b["objects"]}
+    report = next(o for o in b["objects"] if o["type"] == "report")
+    assert set(report["object_refs"]) <= ids                                         # every reference resolves
+    assert all(o.get("spec_version") == "2.1" for o in b["objects"])
+
+
+def test_push_uses_env_key_correct_endpoint_and_never_runs_without_key(demo_chain, monkeypatch):
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from chainhunter import export as ex
+    seen = []
+
+    class H(BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            seen.append((self.path, self.headers.get("Authorization"), body))
+            self.send_response(201); self.send_header("Content-Type", "application/json"); self.end_headers()
+            self.wfile.write(b'{"_id": "~42", "Event": {"id": "7"}}')
+
+        def log_message(self, *a):
+            pass
+
+    srv = HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_port}"
+    try:
+        monkeypatch.delenv("THEHIVE_API_KEY", raising=False)
+        with pytest.raises(ex.PushError):
+            ex.push_thehive(base, [ex.thehive_alert(demo_chain)])                    # no key -> refuses, sends nothing
+        assert not seen
+        monkeypatch.setenv("THEHIVE_API_KEY", "test-key")
+        monkeypatch.setenv("MISP_API_KEY", "misp-key")
+        assert ex.push_thehive(base, [ex.thehive_alert(demo_chain)])[0].startswith("created ~42")
+        assert ex.push_misp(base, [ex.misp_event(demo_chain)])[0].startswith("created event 7")
+    finally:
+        srv.shutdown()
+    assert seen[0][0] == "/api/v1/alert" and seen[0][1] == "Bearer test-key" and seen[0][2]["type"] == "chainhunter"
+    assert seen[1][0] == "/events" and seen[1][1] == "misp-key" and "Event" in seen[1][2]
 
 
 def test_mojibake_repair_restores_rlo():
