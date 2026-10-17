@@ -178,6 +178,17 @@ How it's built, and the problems real data forced:
 - **Case-variant fields.** Real APT29 data has both `IpAddress` and `Ipaddress`, which DuckDB rejects as duplicate columns. Variants are merged into one column, and every original spelling stays queryable.
 - **Known limit.** 6 SigmaHQ rules use free-text keyword search with no event-type filter. They'd need a full scan, so lake mode reports them as skipped rather than silently scanning.
 
+## Public Sigma benchmark (weekly)
+Every Monday, a GitHub Action replays the **latest SigmaHQ release** against the real attack recordings and campaigns, then publishes a trend site to GitHub Pages: detection rate per release, **rules that stopped firing** on a recording (regressions), new detections, and per-campaign results.
+
+Rule regressions are invisible in a rule repo's own CI: rules still parse and their tests still pass. They only show up when the rules are replayed against real attack telemetry, which is what this tracks.
+
+```bash
+python -m chainhunter dashboard --sigma path/to/sigma --history benchmark/history --site site
+```
+
+First run (SigmaHQ `07ec293`, 2,624 rules): **25/30** recordings detected. APT29 day 1: 943 medium+ detections → 1 Critical incident. Golden SAML: 1 Critical incident via sequence `ch-s004`. The AADInternals remote ADFS-config export recording gets **0 detections**, a real coverage gap.
+
 ## Grounded AI analyst (local or Claude)
 An LLM drafts the executive summary, attack narrative and containment steps. **ChainHunter then checks every sentence**; the model doesn't get to decide what counts as supported.
 

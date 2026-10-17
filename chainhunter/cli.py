@@ -31,7 +31,7 @@ from .sequence import run_sequences
 from .validate import coverage, validate
 
 DEFAULT_RULES = Path(__file__).resolve().parent.parent / "rules"
-COMMANDS = {"hunt", "validate", "convert", "bench", "blindspot", "lake", "suppress", "rulehealth", "watch"}
+COMMANDS = {"hunt", "validate", "convert", "bench", "blindspot", "lake", "suppress", "rulehealth", "watch", "dashboard"}
 
 
 def _rules(args):
@@ -246,6 +246,22 @@ def cmd_watch(a) -> int:
     return 0
 
 
+def cmd_dashboard(a) -> int:
+    from .dashboard import load_history, render, run_dashboard, save
+    if not a.render_only:
+        res = run_dashboard(a.sigma, a.manifest, DEFAULT_RULES)
+        out = save(res, a.history)
+        print(f"[+] SigmaHQ {res['sigma_version']}: {res['detected']}/{res['total']} recordings detected, "
+              f"{len(res['campaigns'])} campaign(s) -> {out}")
+    runs = load_history(a.history)
+    if not runs:
+        raise SystemExit(f"[x] no benchmark history in {a.history}")
+    a.site.mkdir(parents=True, exist_ok=True)
+    (a.site / "index.html").write_text(render(runs), encoding="utf-8")
+    print(f"[+] site from {len(runs)} run(s) -> {a.site / 'index.html'}")
+    return 0
+
+
 def cmd_lake(a) -> int:
     from .lake import build_lake
     s = build_lake(a.inputs, a.out, chunk=a.chunk)
@@ -365,6 +381,14 @@ def main(argv=None) -> int:
     w.add_argument("--min-level", default="medium", choices=["informational", "low", "medium", "high", "critical"])
     w.add_argument("--alerts", type=Path, help="append alerts as JSON lines to this file")
     w.set_defaults(fn=cmd_watch)
+
+    db = sub.add_parser("dashboard", help="public Sigma benchmark: run SigmaHQ on real attacks, build the trend site")
+    db.add_argument("--sigma", type=Path, default=Path("sigma"), help="path to a SigmaHQ checkout")
+    db.add_argument("--manifest", type=Path, default=DEFAULT_RULES.parent / "datasets" / "manifest.yml")
+    db.add_argument("--history", type=Path, default=Path("benchmark/history"))
+    db.add_argument("--site", type=Path, default=Path("site"))
+    db.add_argument("--render-only", action="store_true", help="rebuild the site from history without running")
+    db.set_defaults(fn=cmd_dashboard)
 
     rh = sub.add_parser("rulehealth", parents=[common], help="per-rule verdict: TRUST / TUNE / DEAD / UNPROVEN")
     rh.add_argument("inputs", nargs="*", type=Path, help="logs (ideally normal activity) to measure noise on")

@@ -387,6 +387,20 @@ def test_watch_parses_live_wevtutil_xml():
     assert [e["EventRecordID"] for e in evs] == [42, 43] and evs[0]["IpAddress"] == "10.0.0.5" and evs[0]["EventID"] == 4624
 
 
+def test_dashboard_flags_regressions_and_new_detections(tmp_path):
+    from chainhunter.dashboard import diff, load_history, render, save
+    run = lambda ver, day, rules: {"generated": f"2026-10-{day}T06:00:00+00:00", "sigma_version": ver, "rules_loaded": 10,
+                                   "samples": [{"name": "dcsync.evtx", "events": 3, "detected": bool(rules), "error": "",
+                                                "rules": rules}], "detected": int(bool(rules)), "total": 1, "campaigns": {}}
+    save(run("r1", "05", {"a": "DCSync rule", "b": "Old rule"}), tmp_path)
+    save(run("r2", "12", {"a": "DCSync rule", "c": "New rule"}), tmp_path)
+    runs = load_history(tmp_path)
+    reg, new = diff(runs[0], runs[1])
+    assert reg == [("dcsync.evtx", "b", "Old rule")] and new == [("dcsync.evtx", "c", "New rule")]
+    page = render(runs)
+    assert "Regressions" in page and "Old rule" in page and "New rule" in page and "r2" in page
+
+
 def test_mojibake_repair_restores_rlo():
     # real OTRF APT29 data: U+202E stored double-encoded, hiding the RLO masquerade
     ev = normalize({"EventID": 1, "TimeCreated": "2020-05-02T02:55:56Z",

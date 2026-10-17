@@ -1,0 +1,377 @@
+{
+ "generated": "2026-10-17T15:36:57+00:00",
+ "sigma_version": "07ec293",
+ "rules_loaded": 2624,
+ "samples": [
+  {
+   "name": "CA_DCSync_4662.evtx",
+   "events": 3,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "17d619c1-e020-4347-957e-1d1207455c93": "Active Directory Replication from Non Machine Account - DcSync Indicator",
+    "ch-0004": "Directory Replication Requested by Non-Machine Account (DCSync)"
+   }
+  },
+  {
+   "name": "sysmon_10_1_memdump_comsvcs_minidump.evtx",
+   "events": 6,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "646ea171-dded-4578-8a4d-65e9822892e3": "Process Memory Dump Via Comsvcs.DLL",
+    "8a582fe2-0882-4b89-a82a-da6b2dc32937": "Suspicious WmiPrvSE Child Process",
+    "ch-0002": "LSASS Memory Access via comsvcs.dll MiniDump",
+    "d21374ff-f574-44a7-9998-4a8c8bf33d7d": "WmiPrvSE Spawned A Process",
+    "e593cf51-88db-4ee1-b920-37e89012a3c9": "Potentially Suspicious Rundll32 Activity"
+   }
+  },
+  {
+   "name": "sysmon_10_lsass_mimikatz_sekurlsa_logonpasswords.evtx",
+   "events": 1,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "ch-0007": "LSASS Opened with Credential-Read Access Rights",
+    "d0d2f720-d14f-448d-8242-51ff396a334e": "HackTool - Generic Process Access"
+   }
+  },
+  {
+   "name": "sysmon_10_11_lsass_memdump.evtx",
+   "events": 4,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "5ef9853e-4d0e-4a70-846f-a9ca37d876da": "Potential Credential Dumping Activity Via LSASS",
+    "69ca12af-119d-44ed-b50f-a47af0ebc364": "LSASS Process Memory Dump Creation Via Taskmgr.EXE",
+    "9bd012ee-0dff-44d7-84a0-aa698cfd87a3": "LSASS Memory Access by Tool With Dump Keyword In Name",
+    "9f5c1d59-33be-4e60-bcab-85d2f566effd": "Suspicious Process Access to LSASS with Dbgcore/Dbghelp DLLs",
+    "a5a2d357-1ab8-4675-a967-ef9990a59391": "LSASS Process Memory Dump Files",
+    "ch-0007": "LSASS Opened with Credential-Read Access Rights"
+   }
+  },
+  {
+   "name": "sysmon_rdrleakdiag_lsass_dump.evtx",
+   "events": 4,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "c8da0dfd-4ed0-4b68-962d-13c9c884384e": "Potential Credential Dumping Via LSASS Process Clone",
+    "edadb1e5-5919-4e4c-8462-a9e643b02c4b": "Process Memory Dump via RdrLeakDiag.EXE"
+   }
+  },
+  {
+   "name": "Powershell_4104_MiniDumpWriteDump_Lsass.evtx",
+   "events": 4,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "84c174ab-d3ef-481f-9c86-a50d0b8e3edb": "PowerShell Get-Process LSASS in ScriptBlock",
+    "f62176f3-8128-4faa-bf6c-83261322e5eb": "Malicious PowerShell Keywords"
+   }
+  },
+  {
+   "name": "kerberos_pwd_spray_4771.evtx",
+   "events": 12,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "ch-0006": "Windows Event Log Cleared",
+    "d99b79d2-0a6f-4f46-ad8b-260b6e17f982": "Security Eventlog Cleared"
+   }
+  },
+  {
+   "name": "Zerologon_VoidSec_CVE-2020-1472_4626_LT3_Anonym_follwedby_4742_DC_Anony_DC.evtx",
+   "events": 9,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "ch-0006": "Windows Event Log Cleared",
+    "d99b79d2-0a6f-4f46-ad8b-260b6e17f982": "Security Eventlog Cleared"
+   }
+  },
+  {
+   "name": "dc_applog_ntdsutil_dfir_325_326_327.evtx",
+   "events": 4,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "94dc4390-6b7c-4784-8ffc-335334404650": "Dump Ntds.dit To Suspicious Location",
+    "e6e88853-5f20-4c4a-8d26-cd469fd8d31f": "Ntdsutil Abuse"
+   }
+  },
+  {
+   "name": "babyshark_mimikatz_powershell.evtx",
+   "events": 33,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "87911521-7098-470b-a459-9a57fc80bdfd": "Sysmon Configuration Update",
+    "8ac03a65-6c84-4116-acad-dc1558ff7a77": "Sysmon Configuration Change",
+    "ch-0007": "LSASS Opened with Credential-Read Access Rights"
+   }
+  },
+  {
+   "name": "LM_4624_mimikatz_sekurlsa_pth_source_machine.evtx",
+   "events": 6,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "192a0330-c20b-4356-90b6-7b7049ae0b87": "Successful Overpass the Hash Attempt",
+    "8eef149c-bd26-49f2-9e5a-9b00e3af499b": "Pass the Hash Activity 2",
+    "ch-0006": "Windows Event Log Cleared",
+    "d99b79d2-0a6f-4f46-ad8b-260b6e17f982": "Security Eventlog Cleared"
+   }
+  },
+  {
+   "name": "LM_Remote_Service02_7045.evtx",
+   "events": 3,
+   "detected": false,
+   "error": "",
+   "rules": {}
+  },
+  {
+   "name": "LM_renamed_psexecsvc_5145.evtx",
+   "events": 22,
+   "detected": false,
+   "error": "",
+   "rules": {}
+  },
+  {
+   "name": "LM_sysmon_psexec_smb_meterpreter.evtx",
+   "events": 10,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "2617e7ed-adb7-40ba-b0f3-8f9945fe6c09": "Suspicious SYSTEM User Process Creation",
+    "4a5f5a5e-ac01-474b-9b4e-d61298c9df1d": "PowerShell as a Service in Registry",
+    "536e2947-3729-478c-9903-745aaffe60d2": "Suspicious PowerShell Invocations - Specific - ProcessCreation",
+    "5a6b7c8d-9e0f-1a2b-3c4d-5e6f7a8b9c0d": "Cmd Launched with Hidden Start Flags to Suspicious Targets",
+    "61a7697c-cb79-42a8-a2ff-5f0cdfae0130": "Potential CobaltStrike Service Installations - Registry",
+    "98767d61-b2e8-4d71-b661-e36783ee24c1": "Gzip Archive Decode Via PowerShell",
+    "d522eca2-2973-4391-a3e0-ef0374321dae": "Abused Debug Privilege by Arbitrary Parent Processes",
+    "d75d6b6b-adb9-48f7-824b-ac2e786efe1f": "Suspicious FromBase64String Usage On Gzip Archive - Process Creation",
+    "d7bcd677-645d-4691-a8d4-7a5602b780d1": "Potential PowerShell Command Line Obfuscation",
+    "e32d4572-9826-4738-b651-95fa63747e8a": "Base64 Encoded PowerShell Command Detected"
+   }
+  },
+  {
+   "name": "LM_wmiexec_impacket_sysmon_whoami.evtx",
+   "events": 7,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "c248c896-e412-4279-8c15-1c558067b6fa": "Enumerate All Information With Whoami.EXE",
+    "d21374ff-f574-44a7-9998-4a8c8bf33d7d": "WmiPrvSE Spawned A Process"
+   }
+  },
+  {
+   "name": "LM_WMI_4624_4688_TargetHost.evtx",
+   "events": 8,
+   "detected": false,
+   "error": "",
+   "rules": {}
+  },
+  {
+   "name": "LM_ScheduledTask_ATSVC_target_host.evtx",
+   "events": 34,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "12ba6a38-adb3-4d6b-91ba-a7fb248e3199": "Password Policy Enumerated",
+    "35ba1d85-724d-42a3-889f-2e2362bcaf23": "AD Privileged Users or Groups Reconnaissance",
+    "968eef52-9cff-4454-8992-1e74b9cbad6c": "Reconnaissance Activity",
+    "ch-0006": "Windows Event Log Cleared",
+    "d99b79d2-0a6f-4f46-ad8b-260b6e17f982": "Security Eventlog Cleared"
+   }
+  },
+  {
+   "name": "temp_scheduled_task_4698_4699.evtx",
+   "events": 2,
+   "detected": false,
+   "error": "",
+   "rules": {}
+  },
+  {
+   "name": "Network_Service_Guest_added_to_admins_4732.evtx",
+   "events": 2,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "c265cf08-3f99-46c1-8d59-328247057d57": "User Added to Local Administrator Group",
+    "ch-0005": "Member Added to Privileged Group"
+   }
+  },
+  {
+   "name": "persistence_security_dcshadow_4742.evtx",
+   "events": 10,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "17d619c1-e020-4347-957e-1d1207455c93": "Active Directory Replication from Non Machine Account - DcSync Indicator",
+    "32e19d25-4aed-4860-a55a-be99cb0bf7ed": "Possible DC Shadow Attack",
+    "ch-0006": "Windows Event Log Cleared",
+    "d99b79d2-0a6f-4f46-ad8b-260b6e17f982": "Security Eventlog Cleared"
+   }
+  },
+  {
+   "name": "DE_104_system_log_cleared.evtx",
+   "events": 1,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "100ef69e-3327-481c-8e5c-6d80d9507556": "Important Windows Eventlog Cleared",
+    "ch-0006": "Windows Event Log Cleared"
+   }
+  },
+  {
+   "name": "DE_1102_security_log_cleared.evtx",
+   "events": 112,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "ch-0006": "Windows Event Log Cleared",
+    "d99b79d2-0a6f-4f46-ad8b-260b6e17f982": "Security Eventlog Cleared"
+   }
+  },
+  {
+   "name": "DE_renamed_psexec_service_sysmon_17_18.evtx",
+   "events": 11,
+   "detected": false,
+   "error": "",
+   "rules": {}
+  },
+  {
+   "name": "sysmon_lolbin_bohops_vshadow_exec.evtx",
+   "events": 6,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "d7c75059-2901-4578-b209-8837fd31c6a8": "Proxy Execution via Vshadow"
+   }
+  },
+  {
+   "name": "CA_hashdump_4663_4656_lsass_access.evtx",
+   "events": 2,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "4a1b6da0-d94f-4fc3-98fc-2d9cb9e5ee76": "Potentially Suspicious AccessMask Requested From LSASS",
+    "962fe167-e48d-4fd6-9974-11e5b9a5d6d1": "LSASS Access From Non System Account"
+   }
+  },
+  {
+   "name": "sysmon_privesc_psexec_dwell.evtx",
+   "events": 12,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "41504465-5e3a-4a5b-a5b4-2a0baadd4463": "PsExec Tool Execution From Suspicious Locations - PipeName",
+    "7c0dcd3d-acf8-4f71-9570-f448b0034f94": "PsExec Service Child Process Execution as LOCAL SYSTEM",
+    "fdfcbd78-48f1-4a4b-90ac-d82241e368c5": "PsExec Service Execution"
+   }
+  },
+  {
+   "name": "covenant_dcsync_dcerpc_drsuapi_DsGetNCChanges.zip",
+   "events": 869,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "17d619c1-e020-4347-957e-1d1207455c93": "Active Directory Replication from Non Machine Account - DcSync Indicator",
+    "ch-0004": "Directory Replication Requested by Non-Machine Account (DCSync)"
+   }
+  },
+  {
+   "name": "psh_lsass_memory_dump_comsvcs.zip",
+   "events": 184,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "4a1b6da0-d94f-4fc3-98fc-2d9cb9e5ee76": "Potentially Suspicious AccessMask Requested From LSASS",
+    "5ef9853e-4d0e-4a70-846f-a9ca37d876da": "Potential Credential Dumping Activity Via LSASS",
+    "646ea171-dded-4578-8a4d-65e9822892e3": "Process Memory Dump Via Comsvcs.DLL",
+    "962fe167-e48d-4fd6-9974-11e5b9a5d6d1": "LSASS Access From Non System Account",
+    "a49fa4d5-11db-418c-8473-1e014a8dd462": "Lsass Memory Dump via Comsvcs DLL",
+    "a5a2d357-1ab8-4675-a967-ef9990a59391": "LSASS Process Memory Dump Files",
+    "ch-0002": "LSASS Memory Access via comsvcs.dll MiniDump",
+    "ch-0006": "Windows Event Log Cleared",
+    "ch-0007": "LSASS Opened with Credential-Read Access Rights",
+    "d99b79d2-0a6f-4f46-ad8b-260b6e17f982": "Security Eventlog Cleared",
+    "e593cf51-88db-4ee1-b920-37e89012a3c9": "Potentially Suspicious Rundll32 Activity",
+    "ffa6861c-4461-4f59-8a41-578c39f3f23e": "LSASS Dump Keyword In CommandLine"
+   }
+  },
+  {
+   "name": "cmd_psexec_lsa_secrets_dump.zip",
+   "events": 286,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "100ef69e-3327-481c-8e5c-6d80d9507556": "Important Windows Eventlog Cleared",
+    "42c575ea-e41e-41f1-b248-8093c3e82a28": "PsExec Service Installation",
+    "730fc21b-eaff-474b-ad23-90fd265d4988": "Psexec Execution",
+    "7c0dcd3d-acf8-4f71-9570-f448b0034f94": "PsExec Service Child Process Execution as LOCAL SYSTEM",
+    "c7da8edc-49ae-45a2-9e61-9fd860e4e73d": "PUA - Sysinternals Tools Execution - Registry",
+    "ch-0006": "Windows Event Log Cleared",
+    "d99b79d2-0a6f-4f46-ad8b-260b6e17f982": "Security Eventlog Cleared",
+    "fd877b94-9bb5-4191-bb25-d79cbd93c167": "Dumping of Sensitive Hives Via Reg.EXE",
+    "fdfcbd78-48f1-4a4b-90ac-d82241e368c5": "PsExec Service Execution"
+   }
+  },
+  {
+   "name": "empire_psexec_dcerpc_tcp_svcctl.zip",
+   "events": 4348,
+   "detected": true,
+   "error": "",
+   "rules": {
+    "13addce7-47b2-4ca0-a98f-1de964d1d669": "SCM Database Handle Failure",
+    "1d61f71d-59d2-479e-9562-4ff5f4ead16b": "Suspicious Service Installation",
+    "2617e7ed-adb7-40ba-b0f3-8f9945fe6c09": "Suspicious SYSTEM User Process Creation",
+    "2a926e6a-4b81-4011-8a96-e36cc8c04302": "PowerShell Scripts Installed as Services - Security",
+    "4a5f5a5e-ac01-474b-9b4e-d61298c9df1d": "PowerShell as a Service in Registry",
+    "5a6b7c8d-9e0f-1a2b-3c4d-5e6f7a8b9c0d": "Cmd Launched with Hidden Start Flags to Suspicious Targets",
+    "61a7697c-cb79-42a8-a2ff-5f0cdfae0130": "Potential CobaltStrike Service Installations - Registry",
+    "70f00d10-60b2-4f34-b9a0-dc3df3fe762a": "Suspicious Service Installation Script",
+    "79ce34ca-af29-4d0e-b832-fc1b377020db": "Whoami.EXE Execution From Privileged Process",
+    "79f4ede3-402e-41c8-bc3e-ebbf5f162581": "HackTool - Empire PowerShell Launch Parameters",
+    "7d0d0329-0ef1-4e84-a9f5-49500f9d7c6c": "Malicious PowerShell Commandlets - PoshModule",
+    "a2e5019d-a658-4c6a-92bf-7197b54e2cae": "PowerShell Scripts Installed as Services",
+    "ae7fbf8e-f3cb-49fd-8db4-5f3bed522c71": "Suspicious PowerShell Invocations - Specific",
+    "c86133ad-4725-4bd0-8170-210788e0a7ba": "Net WebClient Casing Anomalies",
+    "d522eca2-2973-4391-a3e0-ef0374321dae": "Abused Debug Privilege by Arbitrary Parent Processes",
+    "e0d6c087-2d1c-47fd-8799-3904103c5a98": "AMSI Bypass Pattern Assembly GetType",
+    "fb843269-508c-4b76-8b8d-88679db22ce7": "Suspicious Execution of Powershell with Base64"
+   }
+  }
+ ],
+ "detected": 25,
+ "total": 30,
+ "campaigns": {
+  "apt29/day1": {
+   "events": 196081,
+   "detections": 943,
+   "rules_fired": 67,
+   "incidents": 1,
+   "top_severity": "Critical",
+   "sequences": []
+  },
+  "GoldenSAMLADFSMailAccess": {
+   "events": 52,
+   "detections": 3,
+   "rules_fired": 2,
+   "incidents": 1,
+   "top_severity": "Critical",
+   "sequences": [
+    "ch-s004"
+   ]
+  },
+  "aadinternals_export_adfsdatabaseconfig_remotely": {
+   "events": 285,
+   "detections": 0,
+   "rules_fired": 0,
+   "incidents": 0,
+   "top_severity": "none",
+   "sequences": []
+  }
+ }
+}

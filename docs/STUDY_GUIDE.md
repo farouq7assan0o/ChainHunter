@@ -171,6 +171,8 @@ Two rules keep it honest:
 - **Symptom:** SigmaHQ's Azure rules use `properties.message` and `userAgent` (the diagnostic-export shape); Sentinel exports the same data as `ActivityDisplayName` and `UserAgent`.
 - **Fix:** populate both names at ingest.
 - **And a dash:** real Entra ID writes `Update application – Certificates and secrets management ` (en-dash plus a trailing space), while SigmaHQ's rule uses a hyphen. The rule never fired until operation names were normalised.
+- **Upstream history (worth knowing):** SigmaHQ changed this rule to an en-dash in #5530 (2025), back to a hyphen in #6247 (Aug 2026), and #6294 (open) now proposes matching on *fragments* (`contains "Update application"` + `contains "Certificates and secrets management"`). Each person was right about the pipeline they looked at. Our OTRF sample (2021, `Microsoft.aadiam`) independently confirms the en-dash plus trailing space. Drafts of the upstream reports are in `docs/upstream/`.
+- **Lesson:** matching on robust fragments beats exact strings when the source formatting isn't under your control.
 - **Interview Q:** "How do SIEM connectors affect detection?" → The same event arrives with different field names and formats depending on the connector, so rules must target the normalised schema, and you test them on data from *your* connector.
 
 ### B17. Platform isolation

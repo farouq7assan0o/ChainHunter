@@ -1,0 +1,59 @@
+name: sigma-benchmark
+# Weekly: replay the latest SigmaHQ release against real attack recordings, record the result in
+# benchmark/history/, and publish the trend site to GitHub Pages.
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC
+  workflow_dispatch:       # run on demand from the Actions tab
+
+permissions:
+  contents: write          # commit the new history file
+  pages: write
+  id-token: write
+
+concurrency:
+  group: sigma-benchmark
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.12"}
+      - run: pip install -e ".[evtx,lake]"
+
+      - name: Latest SigmaHQ release
+        run: |
+          TAG=$(curl -s https://api.github.com/repos/SigmaHQ/sigma/releases/latest | python -c "import json,sys; print(json.load(sys.stdin)['tag_name'])")
+          echo "SigmaHQ release: $TAG"
+          git clone --depth 1 --branch "$TAG" https://github.com/SigmaHQ/sigma.git sigma
+          git -C sigma tag -f "$TAG"   # so `git describe --tags` reports the release name
+
+      - name: Fetch attack recordings (sha256-verified)
+        run: python datasets/fetch.py
+
+      - name: Run benchmark and build site
+        run: chainhunter dashboard --sigma sigma --history benchmark/history --site site
+
+      - name: Commit history
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add benchmark/history
+          git commit -m "benchmark: $(ls benchmark/history | tail -1)" || echo "no new result"
+          git push
+
+      - uses: actions/upload-pages-artifact@v4
+        with: {path: site}
+
+  deploy:
+    needs: benchmark
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
