@@ -178,6 +178,14 @@ How it's built, and the problems real data forced:
 - **Case-variant fields.** Real APT29 data has both `IpAddress` and `Ipaddress`, which DuckDB rejects as duplicate columns. Variants are merged into one column, and every original spelling stays queryable.
 - **Known limit.** 6 SigmaHQ rules use free-text keyword search with no event-type filter. They'd need a full scan, so lake mode reports them as skipped rather than silently scanning.
 
+## Entity pages: pivot like an investigation
+Every hunt also writes `entities/`: one page per host, account and source, plus an index sorted by risk.
+- **Each page shows:** risk, first and last seen, the incidents it appears in, its ATT&CK techniques, and a **timeline of every detection involving it**, across incidents.
+- **Related entities are links.** A host lists the accounts seen on it; an account lists the hosts it touched and the sources it came from.
+- **The main report links in:** the risk table and the host and account columns are clickable, so incident → host → account → next host never leaves the browser.
+- **On real APT29:** `DMEVALS\pbeesly` (risk 18,150, 487 detections) links to **NASHUA (395), SCRANTON (86) and NEWYORK (the DC, 6)**, the compromised user's lateral movement at a glance.
+- **Same person, same page:** pages use the same normalisation as correlation, so `NORTH\jon.snow` and `jon.snow@north.local` share one page. A test crawls every generated page and fails on any broken link.
+
 ## Export to TheHive, MISP and STIX 2.1
 ```bash
 python -m chainhunter hunt logs/ -r rules --export thehive,misp,stix            # write files

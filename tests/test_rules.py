@@ -476,6 +476,24 @@ def test_push_uses_env_key_correct_endpoint_and_never_runs_without_key(demo_chai
     assert seen[1][0] == "/events" and seen[1][1] == "misp-key" and "Event" in seen[1][2]
 
 
+def test_entity_pages_pivot_and_every_link_resolves(tmp_path, demo_chain):
+    import re as _re
+    from chainhunter.entities import collect, slug, write_pages
+    from chainhunter.report import html_report
+    n = write_pages([demo_chain], tmp_path / "entities")
+    (tmp_path / "report.html").write_text(html_report([demo_chain], REGISTRY), encoding="utf-8")
+    assert n >= 5 and (tmp_path / "entities" / "index.html").exists()
+    ents = collect([demo_chain])
+    rickon = next(e for e in ents.values() if e.label == "rickon.stark")
+    hosts = {ents[k].label.split(".")[0] for k in rickon.related if k[0] == "host"}
+    assert {"castelblack", "winterfell"} <= hosts                                   # account -> hosts it touched
+    pages = list((tmp_path / "entities").glob("*.html")) + [tmp_path / "report.html"]
+    for page in pages:                                                              # crawl: no broken pivots
+        for href in _re.findall(r"href='([^'#]+\.html)'", page.read_text(encoding="utf-8")):
+            assert (page.parent / href).resolve().exists(), f"{page.name} -> {href}"
+    assert slug("actor", "NORTH\\jon.snow") == slug("actor", "jon.snow@north.local")  # same person, same page
+
+
 def test_mojibake_repair_restores_rlo():
     # real OTRF APT29 data: U+202E stored double-encoded, hiding the RLO masquerade
     ev = normalize({"EventID": 1, "TimeCreated": "2020-05-02T02:55:56Z",

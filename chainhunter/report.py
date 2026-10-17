@@ -157,6 +157,7 @@ svg.lane{width:100%;height:auto;border:1px solid var(--line);border-radius:10px;
 .badge.low,.badge.informational{background:var(--low)}
 .filters{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:8px 0 10px;font-size:14px}
 .filters input[type=search],.filters select{font:inherit;padding:5px 9px;border-radius:7px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+a.elink{color:var(--host);text-decoration:none}a.elink:hover{text-decoration:underline}
 .ai{border:1px solid var(--line);border-radius:10px;padding:4px 16px 10px;background:var(--card)}
 .ai li{margin:4px 0}.ai li.bad{color:var(--muted)}.cite{font:12px ui-monospace,Consolas,monospace;color:var(--host);cursor:help}
 tr.grp td{vertical-align:top}.lvl{font-weight:700;text-transform:capitalize}
@@ -274,6 +275,17 @@ def _graph(c: Chain, per_column: int = 10) -> str:
     return "".join(parts)
 
 
+RISK_KIND = {"Account": "actor", "Host": "host", "Source": "source"}
+
+
+def _elink(kind: str, value: str) -> str:
+    """Link to the entity page (entities/<slug>.html) so analysts can pivot from the report."""
+    from .entities import slug
+    shown = short_host(value) if kind == "host" else value
+    return (f"<a class='elink' href='entities/{slug(kind, value)}.html' title='{html.escape(show(value))}'>"
+            f"{html.escape(show(shown))}</a>")
+
+
 def _evjson(events: list[dict], limit=12) -> str:
     rows = [{k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in ev.items()} for ev in events[:limit]]
     more = f"\n... {len(events) - limit} more" if len(events) > limit else ""
@@ -296,8 +308,8 @@ def _alert_table(c: Chain, groups: list[AlertGroup], registry: dict[str, Rule]) 
         tag = f" <span class='tag {g.rule.kind}'>{g.rule.kind.upper()}</span>" if g.rule.kind != "signature" else ""
         p.append(f"<tr class='grp' data-level='{e(g.level)}' data-host='{e(short_host(g.host))}' data-text='{e(text)}'>"
                  f"<td class='muted'>{e(g.first.strftime('%H:%M:%S'))}</td><td class='lvl {e(g.level)}'>{e(g.level)}</td>"
-                 f"<td><b>{e(g.rule.title)}</b>{tag}<div class='muted'>{e(', '.join(show(a) for a in g.actors[:3]))}</div></td>"
-                 f"<td>{e(short_host(g.host) or 'n/a')}</td><td>{g.count}"
+                 f"<td><b>{e(g.rule.title)}</b>{tag}<div class='muted'>{', '.join(_elink('actor', a) for a in g.actors[:3])}</div></td>"
+                 f"<td>{_elink('host', g.host) if g.host else 'n/a'}</td><td>{g.count}"
                  + (f"<div class='muted'>until {e(g.last.strftime('%H:%M:%S'))}</div>" if g.count > 1 else "")
                  + f"</td><td>{e(g.rule.meta.get('kill_chain', ''))}<div class='muted'>{e(', '.join(g.rule.attack_ids[:3]))}</div></td></tr>")
         qs = _queries(g.detections[0], registry)
@@ -350,11 +362,11 @@ def html_report(chains: list[Chain], registry: dict[str, Rule], stats: dict | No
         p.append("<div class='grid2'><div><h3>Entity graph <span class='muted' style='text-transform:none;"
                  "letter-spacing:0'>— click a node to focus</span></h3>")
         p.append(_graph(c))
-        p.append("</div><div><h3>Entity risk (RBA)</h3><div class='tbl'><table><tr><th>Entity</th><th>Type</th>"
+        p.append("</div><div><h3>Entity risk (RBA) <a class='elink' style='text-transform:none;letter-spacing:0' href='entities/index.html'>· all entities →</a></h3><div class='tbl'><table><tr><th>Entity</th><th>Type</th>"
                  "<th>Risk</th><th>Techniques</th><th>Flag</th></tr>")
         for r in c.risk[:12]:
             techs = sorted(r.techniques)
-            p.append(f"<tr><td><code>{e(show(r.value))}</code></td><td>{r.kind}</td><td>{r.score:,}</td>"
+            p.append(f"<tr><td>{_elink(RISK_KIND[r.kind], r.value)}</td><td>{r.kind}</td><td>{r.score:,}</td>"
                      f"<td title='{e(', '.join(techs))}'>{len(techs)}</td>"
                      f"<td>{'<span class=flag>FLAGGED</span>' if r.flagged else ''}</td></tr>")
         p.append("</table></div></div></div>")

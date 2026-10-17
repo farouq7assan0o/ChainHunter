@@ -152,6 +152,8 @@ def cmd_hunt(a) -> int:
                       file=sys.stderr)
     (a.out / "report.md").write_text(markdown_report(chains, registry, a.title), encoding="utf-8")
     (a.out / "report.html").write_text(html_report(chains, registry, stats, events, ai_html), encoding="utf-8")
+    from .entities import write_pages
+    n_ent = write_pages(chains, a.out / "entities") if chains else 0
     _export(a, chains)
     (a.out / "attack_layer.json").write_text(navigator_layer(chains), encoding="utf-8")
     (a.out / "incidents.json").write_text(json_export(chains), encoding="utf-8")
@@ -162,7 +164,7 @@ def cmd_hunt(a) -> int:
         print(f"    Incident {i}: {c.severity:<8} score={c.score:<4} {' -> '.join(c.phases)}")
         for r in (r for r in c.risk if r.flagged):
             print(f"      ! {r.kind:<7} {r.value:<40} risk={r.score:<4} {', '.join(sorted(r.techniques))}")
-    print(f"[+] Wrote {a.out}/report.md, report.html, attack_layer.json, incidents.json")
+    print(f"[+] Wrote {a.out}/report.md, report.html, attack_layer.json, incidents.json, entities/ ({n_ent} pages)")
     return 0
 
 
