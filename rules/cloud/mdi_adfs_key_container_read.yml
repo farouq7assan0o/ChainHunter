@@ -1,0 +1,31 @@
+title: LDAP Read of the AD FS Key Container (Defender for Identity)
+id: ch-x002
+status: experimental
+description: >
+  Defender for Identity recorded an LDAP query against the AD FS container in Active Directory
+  (CN=ADFS,CN=Microsoft,CN=Program Data), which holds the key protecting the AD FS token-signing certificate.
+  Outside the AD FS service itself, reading it is a strong indicator of token-signing material being collected.
+references:
+  - https://github.com/OTRF/Security-Datasets/tree/master/datasets/compound/GoldenSAMLADFSMailAccess
+tags: [attack.credential_access, attack.t1552.004]
+level: high
+logsource: {product: m365, service: m365d}
+detection:
+  selection:
+    ActionType: LdapSearch
+    AdditionalFields_string.DistinguishedName|contains: 'CN=ADFS,CN=Microsoft,CN=Program Data'
+  filter_adfs_service:
+    InitiatingProcessFileName: Microsoft.IdentityServer.ServiceHost.exe
+  condition: selection and not filter_adfs_service
+falsepositives:
+  - AD FS administration tooling run by the AD FS team - verify against change records
+chainhunter:
+  kill_chain: Credential Access
+  actor_field: [InitiatingProcessAccountUpn, User, AccountUpn]
+  source_field: [InitiatingProcessFileName]
+tests:
+  match:
+    - {EventID: 0, _platform: m365d, Channel: m365d/ldapsearch, ActionType: LdapSearch, Computer: adfs01.simulandlabs.com, InitiatingProcessFileName: powershell.exe, AdditionalFields_string.DistinguishedName: 'CN=596f0e13-7a4b-49a1-a106-0cbcba66b065,CN=ADFS,CN=Microsoft,CN=Program Data,DC=simulandlabs,DC=com'}
+  nomatch:
+    - {EventID: 0, _platform: m365d, Channel: m365d/ldapsearch, ActionType: LdapSearch, Computer: adfs01.simulandlabs.com, InitiatingProcessFileName: Microsoft.IdentityServer.ServiceHost.exe, AdditionalFields_string.DistinguishedName: 'CN=596f0e13,CN=ADFS,CN=Microsoft,CN=Program Data,DC=simulandlabs,DC=com'}
+    - {EventID: 0, _platform: m365d, Channel: m365d/ldapsearch, ActionType: LdapSearch, Computer: adfs01.simulandlabs.com, InitiatingProcessFileName: powershell.exe, AdditionalFields_string.DistinguishedName: 'DC=simulandlabs,DC=com'}

@@ -1,0 +1,25 @@
+title: OAuth Delegated Permission Grant or Application Consent
+id: ch-x003
+status: experimental
+description: >
+  An application was granted delegated permissions (consent) in Microsoft 365 / Entra ID. Consent gives the
+  application ongoing access to a user's data without the user's password, so unexpected grants - especially
+  shortly after other suspicious identity activity - deserve review.
+tags: [attack.credential_access, attack.t1528, attack.persistence, attack.t1098.003]
+level: medium
+logsource: {product: m365, service: m365d}
+detection:
+  sel_defender:
+    ActionType|startswith: ['Add delegated permission grant', 'Consent to application', 'Add app role assignment grant to user']
+  condition: sel_defender
+falsepositives:
+  - Planned app onboarding by administrators
+chainhunter:
+  kill_chain: Persistence
+  actor_field: [AccountUpn, User]
+  source_field: [IpAddress]
+tests:
+  match:
+    - {EventID: 0, _platform: m365d, Channel: m365d/add delegated permission grant., ActionType: Add delegated permission grant., Application: Office 365}
+  nomatch:
+    - {EventID: 0, _platform: m365d, Channel: m365d/mailitemsaccessed, ActionType: MailItemsAccessed}

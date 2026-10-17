@@ -1,0 +1,30 @@
+title: Directory Replication Requested by a User Account (Defender for Identity)
+id: ch-x001
+status: experimental
+description: >
+  Defender for Identity recorded a directory replication request made by a user account. Replication between
+  domain controllers runs as computer accounts (ending in $), so a user account requesting it - especially from
+  a non-DC host - indicates credential material being pulled from the directory.
+references:
+  - https://github.com/OTRF/Security-Datasets/tree/master/datasets/compound/GoldenSAMLADFSMailAccess
+tags: [attack.credential_access, attack.t1003.006]
+level: high
+logsource: {product: m365, service: m365d}
+detection:
+  selection:
+    ActionType: Directory Services replication
+  filter_machine:
+    AccountName|endswith: '$'
+  condition: selection and not filter_machine
+falsepositives:
+  - Directory synchronisation services that replicate under a dedicated user account (e.g. Entra Connect) - add them to a scoped suppression
+chainhunter:
+  kill_chain: Credential Access
+  actor_field: [AccountUpn, User, AccountName]
+  source_field: [IpAddress]
+tests:
+  match:
+    - {EventID: 0, _platform: m365d, Channel: m365d/directory services replication, ActionType: Directory Services replication, AccountName: pgustavo, AccountUpn: pgustavo@simulandlabs.com, Computer: adfs01.simulandlabs.com, DestinationDeviceName: dc01.simulandlabs.com}
+  nomatch:
+    - {EventID: 0, _platform: m365d, Channel: m365d/directory services replication, ActionType: Directory Services replication, AccountName: 'DC02$', Computer: dc02.simulandlabs.com, DestinationDeviceName: dc01.simulandlabs.com}
+    - {EventID: 4662, Channel: Security, ActionType: Directory Services replication, AccountName: pgustavo}

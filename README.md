@@ -257,7 +257,16 @@ What real cloud data exposed:
 - **Two pipelines, two field names.** SigmaHQ's Azure rules use the diagnostic-export shape (`properties.message`, `userAgent`), while Sentinel exports the same events as `ActivityDisplayName` and `UserAgent`. Both names are now populated.
 - **An en-dash defeated an exact match.** Real Entra ID writes `Update application – Certificates and secrets management ` (en-dash, trailing space), while SigmaHQ's rule uses a hyphen. The rule never fired on real data until operation names were normalised.
 - **Platform isolation.** Every event is tagged `azure`, `m365`, `m365d` or Windows, so a Windows keyword rule can't fire on an Entra ID record that happens to contain the word, and vice versa.
-- **Coverage gap.** Defender XDR logged Directory Services replication *from the ADFS server*, and no SigmaHQ rule covers Defender XDR tables.
+- **Coverage gap, now closed.** No SigmaHQ rule covers Defender XDR tables, so the key theft itself was invisible. Four ChainHunter rules (`rules/cloud/`) now cover it: directory replication by a user account (`ch-x001`), LDAP reads of the AD FS key container (`ch-x002`), OAuth delegated permission grants (`ch-x003`) and mailbox access through the REST/Graph API (`ch-x004`). The incident went from 2 visible steps to the full chain:
+  ```
+  13:05  ADFS database pipe accessed by PowerShell       (Sysmon)
+  13:08  Directory replication by a user account          (Defender for Identity)
+  13:11  LDAP reads of the AD FS key container            (Defender for Identity)
+  13:27  OAuth delegated permission grant                 (Defender XDR)
+  13:29  Credentials added to an application              (Entra ID)
+  13:32  Mailbox read through the REST/Graph API          (Exchange Online)
+  ```
+  Sequence `ch-s004` also accepts the Defender-for-Identity form of the first stage, so it works where Sysmon isn't deployed.
 
 ## Live mode
 ```bash

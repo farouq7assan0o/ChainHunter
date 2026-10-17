@@ -95,17 +95,29 @@ def run_sequences(rules: list[Rule], detections: list[Detection], events: list[d
                 del bound[steps[i]["id"]]
             return None
 
+        # Several first-stage hits that complete through the *same* later stages are one attack, not N: they
+        # become a single sequence detection carrying all first-stage evidence (Golden SAML: 7 key-material reads
+        # on the federation server, one cloud credential change -> one alert, not seven).
+        merged: dict[tuple, Detection] = {}
         for start in cands[0]:
             match = extend(1, {steps[0]["id"]: start}, start, start)
             if not match:
                 continue
             ordered = [match[s["id"]] for s in steps]
+            tail = tuple(id(d) for d in ordered[1:])
+            ents = [(k, getattr(d, k)) for d in ordered for k in ("actor", "host", "source") if getattr(d, k)]
+            if tail in merged:
+                det = merged[tail]
+                det.events = sorted({id(e): e for e in det.events + start.events}.values(), key=lambda e: e["TimeCreated"])
+                det.extra["first_stage"].append(start)
+                det.extra["entities"] = list(dict.fromkeys(det.extra["entities"] + ents))
+                continue
             evs = sorted({id(e): e for d in ordered for e in d.events}.values(), key=lambda e: e["TimeCreated"])
             det = Detection(rule=seq, events=evs, actor=ordered[0].actor or ordered[-1].actor,
                             host=ordered[-1].host, source=ordered[0].source,
-                            extra={"steps": [(s["id"], match[s["id"]]) for s in steps],
-                                   "entities": [(k, getattr(d, k)) for d in ordered
-                                                for k in ("actor", "host", "source") if getattr(d, k)]})
+                            extra={"steps": [(s["id"], match[s["id"]]) for s in steps], "entities": ents,
+                                   "first_stage": [start]})
+            merged[tail] = det
             out.append(det)
     out.sort(key=lambda d: d.time)
     return out

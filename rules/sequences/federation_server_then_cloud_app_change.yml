@@ -31,8 +31,18 @@ sequence:
             - '\Microsoft.Tri.Sensor.exe'
             - '\sqlservr.exe'
             - '\tssdis.exe'
-        condition: selection and not filter_known
-      chainhunter: {actor_field: [User], source_field: Image}
+        # same stage seen by Defender for Identity instead of Sysmon (see rules ch-x001 / ch-x002)
+        sel_mdi_key_container:
+          ActionType: LdapSearch
+          AdditionalFields_string.DistinguishedName|contains: 'CN=ADFS,CN=Microsoft,CN=Program Data'
+        filter_mdi_adfs_service:
+          InitiatingProcessFileName: Microsoft.IdentityServer.ServiceHost.exe
+        sel_mdi_replication:
+          ActionType: Directory Services replication
+        filter_mdi_machine:
+          AccountName|endswith: '$'
+        condition: (selection and not filter_known) or (sel_mdi_key_container and not filter_mdi_adfs_service) or (sel_mdi_replication and not filter_mdi_machine)
+      chainhunter: {actor_field: [User, AccountUpn], source_field: [Image, InitiatingProcessFileName]}
     - id: cloud
       detection:
         sel_entra:
@@ -53,6 +63,9 @@ chainhunter:
 tests:
   match:
     - - {EventID: 18, Channel: Microsoft-Windows-Sysmon/Operational, Computer: ADFS01.corp.example, PipeName: '\MICROSOFT##WID\tsql\query', Image: 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe', _offset: 0}
+      - {EventID: 0, _platform: azure, Channel: auditlogs, Computer: Entra ID, User: alice@corp.example, properties.message: 'Update application - Certificates and secrets management', _offset: 1400}
+    # Defender-for-Identity-only environment (no Sysmon): key-container read on the federation server
+    - - {EventID: 0, _platform: m365d, Channel: m365d/ldapsearch, Computer: adfs01.corp.example, ActionType: LdapSearch, InitiatingProcessFileName: powershell.exe, AdditionalFields_string.DistinguishedName: 'CN=1,CN=ADFS,CN=Microsoft,CN=Program Data,DC=corp,DC=example', _offset: 0}
       - {EventID: 0, _platform: azure, Channel: auditlogs, Computer: Entra ID, User: alice@corp.example, properties.message: 'Update application - Certificates and secrets management', _offset: 1400}
   nomatch:
     - - {EventID: 18, Channel: Microsoft-Windows-Sysmon/Operational, Computer: ADFS01.corp.example, PipeName: '\MICROSOFT##WID\tsql\query', Image: 'C:\Windows\ADFS\Microsoft.IdentityServer.ServiceHost.exe', _offset: 0}

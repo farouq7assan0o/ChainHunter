@@ -200,6 +200,18 @@ Two rules keep it honest:
 - **Root cause:** the normaliser cut everything after the first dot, so `jon.snow` became `jon`, and `jon.arryn` would merge with it.
 - **Fix:** only hosts drop their DNS suffix.
 
+### B22. One attack, seven sequence alerts
+- **Symptom:** after adding the Defender XDR rules, the Golden SAML sequence fired 7 times: once per key-material read on the federation server, all completing through the same cloud credential change.
+- **Fix:** first-stage hits that complete through the *same* later stages merge into one sequence detection, which carries all the first-stage evidence. Different attack paths still produce separate alerts.
+- **Concept:** alert deduplication should follow the attack's structure, not the raw event count. Seven alerts for one attack is exactly the alert fatigue the tool exists to reduce.
+
+### B23. Telemetry gap vs rule gap
+- **Situation:** the public benchmark showed the AADInternals "remote AD FS config export" recording with **0 detections from 2,624 rules**.
+- **What it really was:** that recording comes from the *source host* only (image loads, registry, firewall events). The interesting part, directory replication against the DC, isn't in it at all, so no rule could fire on it.
+- **Where it is visible:** the same technique shows up in Defender for Identity telemetry (the Golden SAML recording), where the new rule `ch-x001` catches it.
+- **Concept:** before writing a rule for a gap, ask whether the evidence exists in this telemetry at all. Forcing a rule onto the wrong data source creates false confidence. This is Blindspot thinking applied to a benchmark result.
+- **Interview Q:** "A red-team technique wasn't detected. What do you do?" → First check whether your telemetry even records it (which host, which log, which sensor). Fix the gap where the evidence lives: deploy the sensor, or move the detection to the source that sees it.
+
 ---
 
 ## Part C: Performance (and measuring honestly)

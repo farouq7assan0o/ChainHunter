@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -399,6 +400,25 @@ def test_dashboard_flags_regressions_and_new_detections(tmp_path):
     assert reg == [("dcsync.evtx", "b", "Old rule")] and new == [("dcsync.evtx", "c", "New rule")]
     page = render(runs)
     assert "Regressions" in page and "Old rule" in page and "New rule" in page and "r2" in page
+
+
+def test_sequence_merges_first_stage_hits_sharing_the_same_completion():
+    pipe = lambda s: e(18, s, Channel="Microsoft-Windows-Sysmon/Operational", Computer="ADFS01.corp.example",
+                       PipeName=r"\MICROSOFT##WID\tsql\query", Image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe")
+    cloud = e(0, 900, _platform="azure", Channel="auditlogs", Computer="Entra ID", User="alice@corp.example",
+              **{"properties.message": "Update application - Certificates and secrets management"})
+    events = [pipe(0), pipe(60), pipe(120), cloud]
+    seqs = [d for d in run_sequences(RULES, run(RULES, events), events) if d.rule.id == "ch-s004"]
+    assert len(seqs) == 1                                      # one attack -> one sequence alert, not three
+    assert len(seqs[0].extra["first_stage"]) == 3 and len(seqs[0].events) == 4
+
+
+def test_defender_xdr_rules_on_real_golden_saml_rows():
+    path = ROOT / "datasets" / "cache" / "otrf" / "Microsoft365DefenderEvents.json"
+    if not path.exists():
+        pytest.skip("run datasets/fetch.py first")
+    fired_ids = Counter(d.rule.id for d in run(RULES, load([path])))
+    assert fired_ids["ch-x001"] == 2 and fired_ids["ch-x002"] == 4 and fired_ids["ch-x003"] == 1
 
 
 def test_mojibake_repair_restores_rlo():

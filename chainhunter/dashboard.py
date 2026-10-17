@@ -179,6 +179,8 @@ def render(runs: list[dict]) -> str:
              "captured after the researcher cleared the logs, so a log-clearing alert can count as a detection.</li>"
              "<li>Rules run on ChainHunter's Sigma engine, with SigmaHQ Windows + cloud rules and ChainHunter's own pack. "
              "Rules needing telemetry the engine doesn't ingest (ETW) are skipped.</li>"
+             "<li>A recording with 0 detections is not automatically a rule gap: some recordings capture only one "
+             "side of an attack (e.g. the source host), so the evidence a rule would need isn't in them at all.</li>"
              "<li>This measures detection on attack data only. False-positive rates need labelled normal-activity data.</li>"
              "</ul></section></main></body></html>")
     return "".join(p)

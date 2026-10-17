@@ -1,0 +1,26 @@
+title: Mailbox Items Accessed Through the REST/Graph API
+id: ch-x004
+status: experimental
+description: >
+  Exchange Online recorded mailbox items being read through the REST/Graph API rather than a mail client.
+  Common for legitimate integrations, so low severity on its own - valuable as context inside an incident that
+  also shows identity or application tampering.
+tags: [attack.collection, attack.t1114.002]
+level: low
+logsource: {product: m365, service: exchange}
+detection:
+  selection:
+    Operation: MailItemsAccessed
+    ClientInfoString|startswith: 'Client=REST'
+  condition: selection
+falsepositives:
+  - Line-of-business apps and backup tools reading mail through Graph
+chainhunter:
+  kill_chain: Collection
+  actor_field: [MailboxOwnerUPN, User, UserId]
+  source_field: [IpAddress]
+tests:
+  match:
+    - {EventID: 0, _platform: m365, Channel: officeactivity, Operation: MailItemsAccessed, ClientInfoString: 'Client=REST;;', UserId: pgustavo@simulandlabs.com, IpAddress: 1.2.3.4}
+  nomatch:
+    - {EventID: 0, _platform: m365, Channel: officeactivity, Operation: MailItemsAccessed, ClientInfoString: 'Client=Microsoft.Exchange.Outlook', UserId: pgustavo@simulandlabs.com}
